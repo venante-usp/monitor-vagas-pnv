@@ -12,7 +12,7 @@ Nenhum visitante consegue disparar atualização.
 
 ## Configuração adicional obrigatória para a sincronização pós-deploy
 
-O deploy executa `wrangler deploy` e, logo depois, chama uma rota administrativa protegida. Você precisa configurar o mesmo segredo em dois lugares.
+O deploy executa `wrangler deploy` e, logo depois, cha3ma uma rota administrativa protegida. Você precisa configurar o mesmo segredo em dois lugares.
 
 ### 1. Segredo de execução do Worker
 
