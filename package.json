@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy && node scripts/trigger-deploy-sync.mjs",
+    "deploy:only": "wrangler deploy"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

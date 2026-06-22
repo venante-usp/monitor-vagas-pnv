@@ -1,71 +1,42 @@
 # Monitor de vagas PNV — Cloudflare Free
 
-Projeto pronto para publicar sem custo recorrente no **Cloudflare Workers Free**.
+Monitor automático de disciplinas PNV: o navegador apenas lê os dados do KV. Somente o cron da Cloudflare e o processo de deploy podem consultar o Júpiter.
 
-Ele não consulta o Júpiter no navegador. O Worker faz a consulta no servidor e guarda o resultado no **Workers KV**. Assim, o monitor é atualizado mesmo com o site fechado.
+## Atualização automática
 
-## Como funciona
+- A cada 5 minutos: atualização curta de até 3 disciplinas já ofertadas.
+- À 00:00 de Brasília: começa a varredura completa da lista oficial PNV do Júpiter; cada execução processa até 5 códigos em ritmo lento e com tentativas.
+- Depois de cada deploy: a publicação consulta imediatamente a lista oficial do Júpiter e cria uma nova fila de varredura completa. O primeiro lote é processado pelo próximo cron de 5 minutos.
 
-- **A cada 5 minutos:** atualiza apenas 3 disciplinas ofertadas, uma por vez.
-- **À 00:00 de Brasília:** começa uma sincronização completa.
-  - Primeiro, lê a lista atual de códigos PNV no Júpiter.
-  - Depois consulta 5 disciplinas por ciclo de cinco minutos, sempre uma por vez.
-  - Isso respeita o limite gratuito de consultas externas por execução.
-  - Em uma lista de cerca de 58 códigos, a sincronização normalmente termina por volta de **01:00**.
-- Cada disciplina tem até 3 tentativas, com pausas progressivas; em caso de HTTP 429, o Worker espera antes de tentar de novo.
-- Uma falha temporária não remove a disciplina da tela: a última versão válida é preservada.
-- Uma disciplina só sai do monitor quando uma página válida do Júpiter confirma que ela está sem código de turma ofertada.
+Nenhum visitante consegue disparar atualização.
 
-## Publicação — uma única vez
+## Configuração adicional obrigatória para a sincronização pós-deploy
 
-### 1. Instale o Node.js e abra esta pasta no terminal
+O deploy executa `wrangler deploy` e, logo depois, chama uma rota administrativa protegida. Você precisa configurar o mesmo segredo em dois lugares.
 
-Use Node.js 20 ou superior.
+### 1. Segredo de execução do Worker
 
-```bash
-npm install
-npx wrangler login
-```
+No Cloudflare Dashboard: **Workers & Pages → monitor-vagas-pnv → Settings → Variables and Secrets → Add**.
 
-### 2. Crie o armazenamento KV
+- Tipo: **Secret**
+- Nome: `DEPLOY_SYNC_TOKEN`
+- Valor: uma senha longa e aleatória (use pelo menos 32 caracteres)
 
-```bash
-npx wrangler kv namespace create PNV_MONITOR
-```
+### 2. Variáveis do ambiente de build
 
-O comando mostrará algo semelhante a:
+No mesmo Worker: **Settings → Environment variables** (ou **Build → Build Variables and Secrets**, dependendo do layout do painel).
 
-```text
-id = "abc123..."
-```
+Crie estes dois valores:
 
-Abra `wrangler.jsonc` e troque:
+| Nome | Tipo | Valor |
+|---|---|---|
+| `DEPLOY_SYNC_URL` | Plain text | `https://SEU-SUBDOMINIO.workers.dev/internal/sincronizar-apos-deploy` |
+| `DEPLOY_SYNC_TOKEN` | Secret | exatamente o mesmo valor definido no passo 1 |
 
-```json
-"id": "COLE_AQUI_O_ID_DO_KV"
-```
+Exemplo: se o site público é `https://monitor-vagas-pnv.vitor.workers.dev`, o valor da URL será `https://monitor-vagas-pnv.vitor.workers.dev/internal/sincronizar-apos-deploy`.
 
-pelo ID recebido.
+Com o Workers Builds conectado ao GitHub, deixe o **Deploy command** como `npm run deploy`. Cada commit na branch de produção publicará o Worker e iniciará a fila de consulta sem qualquer ação do visitante.
 
-### 3. Publique
+## Arquivos que não devem receber segredo
 
-```bash
-npm run deploy
-```
-
-O terminal exibirá uma URL como:
-
-```text
-https://monitor-vagas-pnv.seu-subdominio.workers.dev
-```
-
-Essa será a URL pública do monitor.
-
-## Observações importantes
-
-- Não é necessário manter computador, navegador ou aba aberta.
-- A interface é servida pelo próprio Worker; não é preciso configurar Pages nem proxy CORS.
-- O cron usa UTC internamente, mas o código calcula a data de Brasília (`America/Sao_Paulo`) para iniciar a consulta completa à meia-noite local.
-- O plano Free possui 100 mil requisições dinâmicas por dia, 5 cron triggers por conta e até 50 subrequisições por execução. Este projeto usa apenas 1 cron e mantém cada lote abaixo desse teto.
-- A Cloudflare pode mudar limites ou condições de planos no futuro.
-- Deploy inicial pela Cloudflare.
+Nunca coloque o token em `wrangler.jsonc`, JavaScript do navegador, commits do GitHub ou URLs compartilhadas.

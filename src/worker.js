@@ -13,6 +13,7 @@ const URL_TURMA = 'https://uspdigital.usp.br/jupiterweb/obterTurma?sgldis=';
 
 const KEY_DADOS = 'monitor:latest';
 const KEY_ESTADO = 'monitor:state';
+const ROTA_SINCRONIZAR_APOS_DEPLOY = '/internal/sincronizar-apos-deploy';
 
 // Configuração deliberadamente conservadora.
 // O monitor prioriza consistência dos dados do Júpiter, não velocidade.
@@ -31,10 +32,19 @@ const CABECALHOS_JUPITER = {
 };
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    // Rota exclusiva do processo de deploy. Ela é protegida por segredo e não é
+    // chamada pelo navegador dos visitantes; apenas o comando de publicação a usa.
+    if (url.pathname === ROTA_SINCRONIZAR_APOS_DEPLOY) {
+      return iniciarSincronizacaoAposDeploy(request, env);
+    }
+
     if (url.pathname === '/api/monitor') {
+      // Esta rota é somente de leitura. Ela nunca inicia consultas ao Júpiter,
+      // nem altera o KV. Todas as atualizações acontecem exclusivamente pelo
+      // Cron Trigger do Worker, no relógio do servidor.
       const [dados, estado] = await Promise.all([lerDados(env), lerEstado(env)]);
       return respostaJson(montarResposta(dados, estado));
     }
@@ -77,16 +87,27 @@ async function executarCiclo(env, instante) {
       em: agora,
       mensagem: mensagemErro(erro)
     };
-    await salvarDados(env, dados);
+
+    // O próximo ciclo agendado pelo Cron fará uma nova tentativa.
+    if (!estado.full) estado.inicializacaoSolicitadaEm = null;
+    await Promise.all([salvarDados(env, dados), salvarEstado(env, estado)]);
   }
 }
 
-async function iniciarScanCompleto(env, dados, estado, hojeBrt, agora) {
+async function iniciarScanCompleto(env, dados, estado, hojeBrt, agora, { processarPrimeiroLote = true } = {}) {
   const lista = await buscarListaAtual();
   if (!lista.ok) throw new Error(`Não foi possível ler a lista PNV: ${lista.erro}`);
 
-  const codigos = lista.codigos;
+  await prepararScanCompleto(env, dados, estado, lista.codigos, hojeBrt, agora);
+
+  if (processarPrimeiroLote) {
+    await processarLoteCompleto(env, dados, estado, agora);
+  }
+}
+
+async function prepararScanCompleto(env, dados, estado, codigos, hojeBrt, agora) {
   const conjuntoAtual = new Set(codigos);
+  estado.inicializacaoSolicitadaEm = null;
 
   // Uma disciplina que saiu da lista oficial deixa de fazer parte do monitor.
   dados.disciplinas = (dados.disciplinas || []).filter((d) => conjuntoAtual.has(d.codigo));
@@ -107,7 +128,42 @@ async function iniciarScanCompleto(env, dados, estado, hojeBrt, agora) {
   };
 
   await Promise.all([salvarDados(env, dados), salvarEstado(env, estado)]);
-  await processarLoteCompleto(env, dados, estado, agora);
+}
+
+async function iniciarSincronizacaoAposDeploy(request, env) {
+  // Esta rota não deve revelar que existe um comando administrativo: quem não
+  // apresenta o segredo recebe 404, igual a uma rota inexistente.
+  if (request.method !== 'POST' || !segredoConfere(request.headers.get('x-deploy-sync-token'), env.DEPLOY_SYNC_TOKEN)) {
+    return new Response('Not Found', { status: 404 });
+  }
+
+  const agora = Date.now();
+  const [dados, estado] = await Promise.all([lerDados(env), lerEstado(env)]);
+
+  try {
+    // A chamada do deploy consulta a lista oficial do Júpiter imediatamente e
+    // persiste a fila. Os Cron Triggers assumem as turmas em seguida, sempre
+    // no ritmo lento configurado — sem depender de uma visita ao site.
+    await iniciarScanCompleto(env, dados, estado, dataBrt(agora), agora, { processarPrimeiroLote: false });
+
+    return respostaJson({
+      aceito: true,
+      iniciadoEm: agora,
+      proximoLotePeloCron: proximoMultiploDeCincoMinutos(agora)
+    }, 202);
+  } catch (erro) {
+    console.error('Falha ao iniciar sincronização após deploy:', erro?.stack || erro);
+    return respostaJson({ aceito: false, erro: mensagemErro(erro) }, 502);
+  }
+}
+
+function segredoConfere(recebido, esperado) {
+  if (!recebido || !esperado || recebido.length !== esperado.length) return false;
+  let diferenca = 0;
+  for (let indice = 0; indice < recebido.length; indice += 1) {
+    diferenca |= recebido.charCodeAt(indice) ^ esperado.charCodeAt(indice);
+  }
+  return diferenca === 0;
 }
 
 async function processarLoteCompleto(env, dados, estado, agora) {
@@ -513,6 +569,7 @@ function montarResposta(dados, estado) {
       ultimoErro: dados.ultimoErro || null,
       proximaAtualizacaoCurta: proximoMultiploDeCincoMinutos(agora),
       proximaConsultaCompleta: proximaMeiaNoiteBrt(agora),
+      inicializacaoEmAndamento: false,
       fullScan: estado.full ? {
         emAndamento: Boolean(estado.full.emAndamento),
         data: estado.full.data,
@@ -545,8 +602,9 @@ async function lerJson(env, chave) {
 function salvarDados(env, dados) { return env.PNV_MONITOR.put(KEY_DADOS, JSON.stringify(dados)); }
 function salvarEstado(env, estado) { return env.PNV_MONITOR.put(KEY_ESTADO, JSON.stringify(estado)); }
 
-function respostaJson(dados) {
+function respostaJson(dados, status = 200) {
   return new Response(JSON.stringify(dados), {
+    status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store, max-age=0'
