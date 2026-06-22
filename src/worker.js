@@ -1,5 +1,5 @@
 /**
- * Monitor de vagas PNV — Cloudflare Workers Free
+ * Monitor de vagas PNV — Cloudflare Workers Free (V6: charset)
  *
  * - Interface estática servida pelo próprio Worker.
  * - Dados ficam no Workers KV.
@@ -368,7 +368,10 @@ async function buscarTexto(url) {
     }
     if (!resposta.ok) return { ok: false, erro: `HTTP ${resposta.status}` };
 
-    const html = await resposta.text();
+    // O Júpiter ainda entrega diversas páginas em Windows-1252/ISO-8859-1.
+    // Response.text() sempre assume UTF-8 e transforma caracteres como “á” em
+    // “�”. Por isso lemos os bytes e escolhemos a decodificação mais plausível.
+    const html = await decodificarHtmlDoJupiter(resposta);
     return html.length >= 100 ? { ok: true, html } : { ok: false, erro: 'Resposta vazia ou incompleta.' };
   } catch (erro) {
     const timeout = controlador.signal.aborted;
@@ -378,23 +381,77 @@ async function buscarTexto(url) {
   }
 }
 
+/**
+ * Decodifica a resposta do Júpiter sem depender do charset declarado no header.
+ * O site alterna entre páginas UTF-8 e páginas em Windows-1252/ISO-8859-1.
+ */
+async function decodificarHtmlDoJupiter(resposta) {
+  const bytes = new Uint8Array(await resposta.arrayBuffer());
+  const contentType = resposta.headers.get('content-type') || '';
+  const charsetDeclarado = contentType.match(/charset\s*=\s*[\"']?([^;\s\"']+)/i)?.[1]?.toLowerCase() || '';
+
+  const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+  const windows1252 = new TextDecoder('windows-1252', { fatal: false }).decode(bytes);
+
+  const pontuacaoUtf8 = pontuarDecodificacao(utf8);
+  const pontuacaoWindows1252 = pontuarDecodificacao(windows1252);
+  const declaradoComoLatin = /(?:iso[-_]?8859[-_]?1|latin[-_]?1|windows[-_]?1252|cp1252)/i.test(charsetDeclarado);
+  const declaradoComoUtf8 = /utf[-_]?8/i.test(charsetDeclarado);
+
+  // Damos preferência ao charset declarado somente quando ele não produz texto
+  // claramente pior. Isso corrige headers ausentes ou incorretos do Júpiter.
+  if (declaradoComoLatin && pontuacaoWindows1252 <= pontuacaoUtf8 + 1) return windows1252;
+  if (declaradoComoUtf8 && pontuacaoUtf8 <= pontuacaoWindows1252 + 1) return utf8;
+  return pontuacaoWindows1252 < pontuacaoUtf8 ? windows1252 : utf8;
+}
+
+function pontuarDecodificacao(texto) {
+  const valor = String(texto || '');
+  const substituicoes = (valor.match(/\uFFFD/g) || []).length;
+  const mojibake = (valor.match(/(?:Ã.|Â.|â..)/g) || []).length;
+  const nulos = (valor.match(/\u0000/g) || []).length;
+  return substituicoes * 20 + mojibake * 4 + nulos * 10;
+}
+
+function decodificarEntidadesHtml(valor) {
+  const entidades = {
+    amp: '&', lt: '<', gt: '>', quot: '\"', apos: "'", nbsp: ' ',
+    aacute: 'á', agrave: 'à', acirc: 'â', atilde: 'ã', auml: 'ä',
+    eacute: 'é', egrave: 'è', ecirc: 'ê', euml: 'ë',
+    iacute: 'í', igrave: 'ì', icirc: 'î', iuml: 'ï',
+    oacute: 'ó', ograve: 'ò', ocirc: 'ô', otilde: 'õ', ouml: 'ö',
+    uacute: 'ú', ugrave: 'ù', ucirc: 'û', uuml: 'ü',
+    ccedil: 'ç', ntilde: 'ñ', ordm: 'º', ordf: 'ª',
+    Aacute: 'Á', Agrave: 'À', Acirc: 'Â', Atilde: 'Ã',
+    Eacute: 'É', Ecirc: 'Ê', Iacute: 'Í', Oacute: 'Ó', Otilde: 'Õ',
+    Uacute: 'Ú', Ccedil: 'Ç', Ntilde: 'Ñ'
+  };
+
+  return String(valor || '').replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]+);/gi, (inteiro, codigo) => {
+    if (codigo[0] === '#') {
+      const numero = codigo[1]?.toLowerCase() === 'x'
+        ? Number.parseInt(codigo.slice(2), 16)
+        : Number.parseInt(codigo.slice(1), 10);
+      if (Number.isFinite(numero) && numero >= 0 && numero <= 0x10ffff) {
+        try { return String.fromCodePoint(numero); } catch { return inteiro; }
+      }
+      return inteiro;
+    }
+    return entidades[codigo] || entidades[codigo.toLowerCase()] || inteiro;
+  });
+}
+
 function textoDaPagina(html) {
   return normalizarTexto(
-    String(html || '')
-      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
-      .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, ' ')
-      .replace(/<\/?(?:tr|p|div|li|h\d|table|br|td|th)[^>]*>/gi, '\n')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;|&#160;/gi, ' ')
-      .replace(/&amp;/gi, '&')
-      .replace(/&(?:aacute|#225);/gi, 'á')
-      .replace(/&(?:eacute|#233);/gi, 'é')
-      .replace(/&(?:iacute|#237);/gi, 'í')
-      .replace(/&(?:oacute|#243);/gi, 'ó')
-      .replace(/&(?:uacute|#250);/gi, 'ú')
-      .replace(/&ccedil;|&#231;/gi, 'ç')
+    decodificarEntidadesHtml(
+      String(html || '')
+        .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
+        .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, ' ')
+        .replace(/<\/?(?:tr|p|div|li|h\d|table|br|td|th)[^>]*>/gi, '\n')
+        .replace(/<[^>]+>/g, ' ')
+    )
   );
 }
 
