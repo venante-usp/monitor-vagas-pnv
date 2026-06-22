@@ -68,3 +68,4 @@ Essa será a URL pública do monitor.
 - O cron usa UTC internamente, mas o código calcula a data de Brasília (`America/Sao_Paulo`) para iniciar a consulta completa à meia-noite local.
 - O plano Free possui 100 mil requisições dinâmicas por dia, 5 cron triggers por conta e até 50 subrequisições por execução. Este projeto usa apenas 1 cron e mantém cada lote abaixo desse teto.
 - A Cloudflare pode mudar limites ou condições de planos no futuro.
+- Deploy inicial pela Cloudflare.
