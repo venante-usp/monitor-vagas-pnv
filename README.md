@@ -11,7 +11,7 @@ Monitor automático de disciplinas PNV: o navegador apenas lê os dados do KV. S
 Nenhum visitante consegue disparar atualização.
 
 ## Configuração adicional obrigatória para a sincronização pós-deploy
-
+4
 O deploy executa `wrangler deploy` e, logo depois, cha3ma uma rota administrativa protegida. Você precisa configurar o mesmo segredo em dois lugares.
 
 ### 1. Segredo de execução do Worker
