@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "monitor-vagas-pnv",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-06-22",
+
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+
+  "kv_namespaces": [
+    {
+      "binding": "PNV_MONITOR",
+      "id": "COLE_AQUI_O_ID_DO_KV"
+    }
+  ],
+
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}
