@@ -6,6 +6,8 @@
  * - Um Cron a cada 5 min executa as atualizações no servidor.
  * - A varredura completa começa à 00:00 de America/Sao_Paulo e é dividida
  *   em lotes para respeitar o teto gratuito de subrequisições externas.
+ * - Histórico diário é mantido sem prazo fixo: só os meses mais antigos
+ *   são removidos automaticamente quando a reserva de armazenamento se aproxima da cota.
  */
 
 const URL_LISTA_PNV = 'https://uspdigital.usp.br/jupiterweb/jupDisciplinaLista?codcg=3&pfxdisval=PNV&tipo=D';
@@ -13,8 +15,21 @@ const URL_TURMA = 'https://uspdigital.usp.br/jupiterweb/obterTurma?sgldis=';
 
 const KEY_DADOS = 'monitor:latest';
 const KEY_ESTADO = 'monitor:state';
-const KEY_HISTORICO = 'monitor:history:v1';
-const DIAS_HISTORICO = 366;
+// Histórico V2: dividido por mês para manter dados diários por tempo indeterminado.
+// O índice acompanha o tamanho estimado e remove somente os meses mais antigos
+// quando a reserva configurada para o KV estiver próxima do limite do plano Free.
+const KEY_HISTORICO_LEGADO = 'monitor:history:v1';
+const KEY_HISTORICO_INDICE = 'monitor:history:index:v2';
+const PREFIXO_HISTORICO_MES = 'monitor:history:month:v2:';
+
+// O plano Free do Workers KV oferece 1 GB. O Worker não recebe o uso total
+// exato do namespace, então acompanha os bytes que ele mesmo gravou no
+// histórico. A reserva deixa espaço para o monitor atual, o estado do scan e
+// pequenas diferenças de serialização/metadata do KV.
+const LIMITE_HISTORICO_BYTES = 820 * 1024 * 1024; // inicia a retenção automática.
+const ALVO_HISTORICO_BYTES = 780 * 1024 * 1024; // reduz até esta faixa após cruzar o limite.
+const LIMITE_VALOR_HISTORICO_BYTES = 24 * 1024 * 1024; // abaixo de 25 MiB por chave do KV.
+
 const ROTA_SINCRONIZAR_APOS_DEPLOY = '/internal/sincronizar-apos-deploy';
 
 // Configuração deliberadamente conservadora.
@@ -983,11 +998,19 @@ function ordenarDisciplinas(disciplinas) {
 
 
 /**
- * Histórico anual compactado.
+ * Histórico diário sem prazo fixo de retenção.
  *
- * Cada disciplina guarda segmentos de datas consecutivas com o mesmo estado.
- * Ex.: 01–15/08 com 23 inscritos ocupa um único registro; a interface expande
- * esse intervalo em pontos diários apenas na hora de desenhar o gráfico.
+ * O histórico anterior (V1) ficava inteiro em uma única chave e era limitado a
+ * 366 dias. A V2 divide os dados em chaves mensais. Cada mês continua usando
+ * segmentos compactados: dias consecutivos com o mesmo estado ocupam somente
+ * um segmento. Isso mantém o detalhe diário disponível sem crescer por dia de
+ * forma desnecessária.
+ *
+ * O Workers KV não informa o uso total do namespace diretamente ao Worker. Por
+ * isso, o índice mede os bytes escritos pelo próprio histórico e começa a
+ * apagar somente os meses mais antigos ao ultrapassar uma reserva conservadora.
+ * Se o KV ainda responder erro de capacidade, o código remove meses adicionais,
+ * um a um, até a gravação voltar a caber.
  */
 async function registrarSnapshotDiario(env, dados, full, agora) {
   const data = full?.data || dataBrt(agora);
@@ -998,22 +1021,31 @@ async function registrarSnapshotDiario(env, dados, full, agora) {
 
   if (!codigos.length) return;
 
-  const historico = await lerHistorico(env);
-  historico.cursos ||= {};
-  historico.ultimaData = data;
-  historico.atualizadoEm = agora;
+  const indice = await migrarHistoricoLegadoSeNecessario(env);
+  const mes = data.slice(0, 7);
+  const historicoMes = await lerHistoricoMes(env, mes);
+  historicoMes.cursos ||= {};
+  historicoMes.mes = mes;
+
+  indice.ultimaData = data;
+  indice.atualizadoEm = agora;
 
   const disciplinasPorCodigo = new Map((dados.disciplinas || []).map((disciplina) => [disciplina.codigo, disciplina]));
 
   for (const codigo of codigos) {
-    // Falha transitória não deve virar zero no gráfico. Nesse caso, o último
-    // estado confirmado permanece encerrado e a interface mostra uma lacuna.
+    // Falha transitória não deve virar zero no gráfico. O dia fica sem leitura
+    // confirmada, preservando a integridade da série histórica.
     const situacao = confirmadas[codigo];
     if (!situacao) continue;
 
     const disciplina = disciplinasPorCodigo.get(codigo);
-    const curso = historico.cursos[codigo] ||= { nome: disciplina?.nome || codigo, segmentos: [] };
-    if (disciplina?.nome) curso.nome = disciplina.nome;
+    const cursoMes = historicoMes.cursos[codigo] ||= { nome: disciplina?.nome || codigo, segmentos: [] };
+    if (disciplina?.nome) cursoMes.nome = disciplina.nome;
+
+    const cursoIndice = indice.cursos[codigo] ||= { nome: disciplina?.nome || codigo, meses: [] };
+    if (disciplina?.nome) cursoIndice.nome = disciplina.nome;
+    if (!cursoIndice.meses.includes(mes)) cursoIndice.meses.push(mes);
+    cursoIndice.meses.sort();
 
     let estado;
     if (situacao === 'ofertada' && disciplina) {
@@ -1030,16 +1062,15 @@ async function registrarSnapshotDiario(env, dados, full, agora) {
       continue;
     }
 
-    inserirEstadoNoHistorico(curso.segmentos, data, estado);
+    inserirEstadoNoHistorico(cursoMes.segmentos, data, estado);
   }
 
-  limitarHistorico(historico, data);
-  await salvarHistorico(env, historico);
+  await salvarHistoricoMensal(env, indice, mes, historicoMes);
 }
 
 function inserirEstadoNoHistorico(segmentos, data, estado) {
   const normalizados = Array.isArray(segmentos) ? segmentos : [];
-  let indice = normalizados.findIndex((segmento) => segmento.inicio <= data && data <= segmento.fim);
+  const indice = normalizados.findIndex((segmento) => segmento.inicio <= data && data <= segmento.fim);
 
   if (indice >= 0) {
     const atual = normalizados[indice];
@@ -1093,31 +1124,202 @@ function mesclarSegmentosHistoricos(segmentos) {
   }
 }
 
-function limitarHistorico(historico, dataReferencia) {
-  const corte = deslocarData(dataReferencia, -(DIAS_HISTORICO - 1));
-  for (const curso of Object.values(historico.cursos || {})) {
-    const mantidos = [];
-    for (const segmento of curso.segmentos || []) {
-      if (segmento.fim < corte) continue;
-      if (segmento.inicio < corte) segmento.inicio = corte;
-      mantidos.push(segmento);
+async function migrarHistoricoLegadoSeNecessario(env) {
+  const indiceExistente = await lerIndiceHistorico(env);
+  if (indiceExistente.migracaoLegadoConcluida) return indiceExistente;
+
+  const legado = await lerJson(env, KEY_HISTORICO_LEGADO);
+  if (!legado?.cursos || !Object.keys(legado.cursos).length) {
+    indiceExistente.migracaoLegadoConcluida = true;
+    await salvarIndiceHistorico(env, indiceExistente);
+    return indiceExistente;
+  }
+
+  const meses = new Map();
+  const indice = indiceExistente;
+  indice.cursos ||= {};
+  indice.meses ||= {};
+
+  for (const [codigo, cursoLegado] of Object.entries(legado.cursos || {})) {
+    const cursoIndice = indice.cursos[codigo] ||= { nome: cursoLegado.nome || codigo, meses: [] };
+    if (cursoLegado.nome) cursoIndice.nome = cursoLegado.nome;
+
+    for (const segmentoLegado of cursoLegado.segmentos || []) {
+      const estado = extrairEstadoHistorico(segmentoLegado);
+      let cursor = segmentoLegado.inicio;
+      while (cursor && cursor <= segmentoLegado.fim) {
+        const mes = cursor.slice(0, 7);
+        const fimParte = menorData(segmentoLegado.fim, ultimoDiaDoMes(cursor));
+        if (!meses.has(mes)) meses.set(mes, await lerHistoricoMes(env, mes));
+        const historicoMes = meses.get(mes);
+        historicoMes.cursos ||= {};
+        historicoMes.mes = mes;
+        const cursoMes = historicoMes.cursos[codigo] ||= { nome: cursoLegado.nome || codigo, segmentos: [] };
+        if (cursoLegado.nome) cursoMes.nome = cursoLegado.nome;
+        cursoMes.segmentos.push({ ...estado, inicio: cursor, fim: fimParte });
+        if (!cursoIndice.meses.includes(mes)) cursoIndice.meses.push(mes);
+        cursor = diaSeguinte(fimParte);
+      }
     }
-    curso.segmentos = mantidos;
+  }
+
+  for (const [mes, historicoMes] of meses) {
+    for (const curso of Object.values(historicoMes.cursos || {})) {
+      curso.segmentos.sort((a, b) => a.inicio.localeCompare(b.inicio));
+      mesclarSegmentosHistoricos(curso.segmentos);
+    }
+    await prepararMesNoIndice(indice, mes, historicoMes);
+    await env.PNV_MONITOR.put(chaveHistoricoMes(mes), JSON.stringify(historicoMes));
+  }
+
+  for (const curso of Object.values(indice.cursos)) curso.meses.sort();
+  indice.ultimaData = legado.ultimaData || indice.ultimaData || null;
+  indice.atualizadoEm = Date.now();
+  indice.migracaoLegadoConcluida = true;
+  await aplicarRetencaoPorCapacidade(env, indice);
+  await salvarIndiceHistorico(env, indice);
+  await env.PNV_MONITOR.delete(KEY_HISTORICO_LEGADO);
+  return indice;
+}
+
+async function salvarHistoricoMensal(env, indice, mes, historicoMes) {
+  const serializado = JSON.stringify(historicoMes);
+  const tamanho = tamanhoUtf8(serializado);
+  if (tamanho > LIMITE_VALOR_HISTORICO_BYTES) {
+    throw new Error(`O histórico de ${mes} ultrapassou o limite individual de armazenamento.`, { cause: null });
+  }
+
+  await prepararMesNoIndice(indice, mes, historicoMes, tamanho);
+  await aplicarRetencaoPorCapacidade(env, indice, new Set([mes]));
+
+  try {
+    await gravarHistoricoComRecuperacao(env, indice, mes, serializado);
+    await salvarIndiceHistorico(env, indice);
+  } catch (erro) {
+    throw erro;
   }
 }
 
+async function gravarHistoricoComRecuperacao(env, indice, mes, serializado) {
+  try {
+    await env.PNV_MONITOR.put(chaveHistoricoMes(mes), serializado);
+    return;
+  } catch (erroInicial) {
+    if (!erroPareceCapacidade(erroInicial)) throw erroInicial;
+
+    // Caso o uso real do namespace seja maior do que a estimativa local,
+    // libera os meses mais antigos, um a um, e tenta novamente. Nunca toca no
+    // mês em gravação nem em registros recentes por uma simples alteração de código.
+    for (let tentativa = 0; tentativa < 60; tentativa += 1) {
+      const removeu = await removerMesesAntigos(env, indice, new Set([mes]), 1);
+      if (!removeu) throw erroInicial;
+      try {
+        await env.PNV_MONITOR.put(chaveHistoricoMes(mes), serializado);
+        return;
+      } catch (erroSeguinte) {
+        if (!erroPareceCapacidade(erroSeguinte)) throw erroSeguinte;
+      }
+    }
+
+    throw new Error('Não foi possível liberar espaço suficiente para gravar o histórico diário.');
+  }
+}
+
+async function prepararMesNoIndice(indice, mes, historicoMes, tamanhoConhecido = null) {
+  const serializado = tamanhoConhecido === null ? JSON.stringify(historicoMes) : null;
+  const bytes = tamanhoConhecido ?? tamanhoUtf8(serializado);
+  indice.meses ||= {};
+  indice.meses[mes] = {
+    bytes,
+    primeiraData: primeiraDataDoMes(historicoMes) || `${mes}-01`,
+    ultimaData: ultimaDataDoMes(historicoMes) || ultimoDiaDoMes(`${mes}-01`)
+  };
+  recalcularBytesEstimados(indice);
+}
+
+async function aplicarRetencaoPorCapacidade(env, indice, protegidos = new Set()) {
+  // A retenção não tem prazo em dias/anos. Só começa quando a estimativa
+  // ultrapassa a reserva e então volta para uma faixa segura, removendo sempre
+  // meses completos e mais antigos primeiro.
+  if (Number(indice.bytesEstimados || 0) <= LIMITE_HISTORICO_BYTES) return;
+
+  while (Number(indice.bytesEstimados || 0) > ALVO_HISTORICO_BYTES) {
+    const removido = await removerMesesAntigos(env, indice, protegidos, 1);
+    if (!removido) break;
+  }
+}
+
+async function removerMesesAntigos(env, indice, protegidos = new Set(), quantidade = 1) {
+  const candidatos = Object.keys(indice.meses || {})
+    .filter((mes) => !protegidos.has(mes))
+    .sort();
+  if (!candidatos.length) return false;
+
+  let removeu = false;
+  for (const mes of candidatos.slice(0, quantidade)) {
+    await env.PNV_MONITOR.delete(chaveHistoricoMes(mes));
+    delete indice.meses[mes];
+    for (const [codigo, curso] of Object.entries(indice.cursos || {})) {
+      curso.meses = (curso.meses || []).filter((item) => item !== mes);
+      if (!curso.meses.length) delete indice.cursos[codigo];
+    }
+    removeu = true;
+  }
+  recalcularBytesEstimados(indice);
+  return removeu;
+}
+
+function recalcularBytesEstimados(indice) {
+  indice.bytesEstimados = Object.values(indice.meses || {}).reduce((soma, meta) => soma + Number(meta.bytes || 0), 0);
+}
+
+function chaveHistoricoMes(mes) { return `${PREFIXO_HISTORICO_MES}${mes}`; }
+function tamanhoUtf8(texto) { return new TextEncoder().encode(texto).byteLength; }
+function menorData(a, b) { return a < b ? a : b; }
+function primeiroDiaDoMes(data) { return `${String(data).slice(0, 7)}-01`; }
+function ultimoDiaDoMes(data) {
+  const dataBase = new Date(`${String(data).slice(0, 7)}-01T00:00:00Z`);
+  dataBase.setUTCMonth(dataBase.getUTCMonth() + 1, 0);
+  return dataBase.toISOString().slice(0, 10);
+}
+function primeiraDataDoMes(historicoMes) {
+  let menor = null;
+  for (const curso of Object.values(historicoMes.cursos || {})) {
+    for (const segmento of curso.segmentos || []) if (!menor || segmento.inicio < menor) menor = segmento.inicio;
+  }
+  return menor;
+}
+function ultimaDataDoMes(historicoMes) {
+  let maior = null;
+  for (const curso of Object.values(historicoMes.cursos || {})) {
+    for (const segmento of curso.segmentos || []) if (!maior || segmento.fim > maior) maior = segmento.fim;
+  }
+  return maior;
+}
+function erroPareceCapacidade(erro) {
+  const mensagem = String(erro?.message || erro || '').toLowerCase();
+  return /quota|capacity|storage|limit|exceed|too large/.test(mensagem);
+}
+
 async function responderHistorico(url, env) {
-  const historico = await lerHistorico(env);
+  const indice = await lerIndiceHistorico(env);
   const codigo = String(url.searchParams.get('codigo') || '').trim().toUpperCase();
 
   if (!codigo) {
-    const catalogo = Object.entries(historico.cursos || {})
+    const catalogo = Object.entries(indice.cursos || {})
+      .filter(([, curso]) => Array.isArray(curso.meses) && curso.meses.length)
       .map(([itemCodigo, curso]) => ({ codigo: itemCodigo, nome: curso.nome || itemCodigo }))
       .sort((a, b) => a.codigo.localeCompare(b.codigo));
     return {
       catalogo,
-      ultimaData: historico.ultimaData || null,
-      atualizadoEm: historico.atualizadoEm || null
+      ultimaData: indice.ultimaData || null,
+      atualizadoEm: indice.atualizadoEm || null,
+      retencao: {
+        semPrazoFixo: true,
+        bytesEstimados: Number(indice.bytesEstimados || 0),
+        limiteBytes: LIMITE_HISTORICO_BYTES,
+        alvoBytes: ALVO_HISTORICO_BYTES
+      }
     };
   }
 
@@ -1125,33 +1327,58 @@ async function responderHistorico(url, env) {
     return { codigo, erro: 'Código de disciplina inválido.', serie: [] };
   }
 
-  const curso = historico.cursos?.[codigo];
-  if (!curso) {
-    return { codigo, nome: codigo, ultimaData: historico.ultimaData || null, serie: [] };
+  const cursoIndice = indice.cursos?.[codigo];
+  if (!cursoIndice?.meses?.length) {
+    return { codigo, nome: codigo, ultimaData: indice.ultimaData || null, serie: [] };
   }
 
-  const diasSolicitados = limitarNumero(url.searchParams.get('dias'), 365, 30, DIAS_HISTORICO);
-  const fim = historico.ultimaData || dataBrt(Date.now());
-  const inicioSolicitado = deslocarData(fim, -(diasSolicitados - 1));
-  const primeiraData = (curso.segmentos || []).reduce((menor, segmento) => !menor || segmento.inicio < menor ? segmento.inicio : menor, null);
-  const inicio = primeiraData && primeiraData > inicioSolicitado ? primeiraData : inicioSolicitado;
-  const serie = expandirHistorico(curso.segmentos || [], inicio, fim);
+  const diasParametro = String(url.searchParams.get('dias') || '').trim().toLowerCase();
+  const todoHistorico = diasParametro === 'todo' || diasParametro === 'tudo';
+  const diasSolicitados = todoHistorico
+    ? null
+    : limitarNumero(diasParametro, 365, 30, Number.MAX_SAFE_INTEGER);
+  const fim = indice.ultimaData || dataBrt(Date.now());
+  const mesesDoCurso = [...cursoIndice.meses].sort();
+  const primeiroMes = mesesDoCurso[0];
+  const primeiraData = primeiroMes ? `${primeiroMes}-01` : null;
+  const inicioSolicitado = todoHistorico
+    ? primeiraData
+    : deslocarData(fim, -(diasSolicitados - 1));
+  const inicio = primeiraData && inicioSolicitado && primeiraData > inicioSolicitado ? primeiraData : inicioSolicitado;
+  const mesesNecessarios = mesesEntre(inicio, fim).filter((mes) => mesesDoCurso.includes(mes));
+  const historicosMensais = await Promise.all(mesesNecessarios.map((mes) => lerHistoricoMes(env, mes)));
+  const segmentos = historicosMensais.flatMap((historicoMes) => historicoMes.cursos?.[codigo]?.segmentos || []);
+  const serie = expandirHistorico(segmentos, inicio, fim);
 
   return {
     codigo,
-    nome: curso.nome || codigo,
+    nome: cursoIndice.nome || codigo,
     inicio,
     fim,
     primeiraData,
-    ultimaData: historico.ultimaData || null,
+    ultimaData: indice.ultimaData || null,
     serie
   };
 }
 
+function mesesEntre(inicio, fim) {
+  const meses = [];
+  let cursor = primeiroDiaDoMes(inicio);
+  const ultimo = primeiroDiaDoMes(fim);
+  while (cursor <= ultimo) {
+    meses.push(cursor.slice(0, 7));
+    const data = new Date(`${cursor}T00:00:00Z`);
+    data.setUTCMonth(data.getUTCMonth() + 1);
+    cursor = data.toISOString().slice(0, 10);
+  }
+  return meses;
+}
+
 function expandirHistorico(segmentos, inicio, fim) {
+  const ordenados = [...segmentos].sort((a, b) => a.inicio.localeCompare(b.inicio));
   const serie = [];
   for (let data = inicio; data <= fim; data = diaSeguinte(data)) {
-    const segmento = segmentos.find((item) => item.inicio <= data && data <= item.fim);
+    const segmento = ordenados.find((item) => item.inicio <= data && data <= item.fim);
     if (!segmento) {
       serie.push({ data, ofertada: null, inscritos: null, pendentes: null, matriculados: null, pessoas: null });
       continue;
@@ -1182,6 +1409,27 @@ function diaSeguinte(data) { return deslocarData(data, 1); }
 function limitarNumero(valor, padrao, minimo, maximo) {
   const numero = Number.parseInt(valor, 10);
   return Number.isFinite(numero) ? Math.max(minimo, Math.min(maximo, numero)) : padrao;
+}
+
+async function lerIndiceHistorico(env) {
+  return (await lerJson(env, KEY_HISTORICO_INDICE)) || {
+    versao: 2,
+    cursos: {},
+    meses: {},
+    ultimaData: null,
+    atualizadoEm: null,
+    bytesEstimados: 0,
+    migracaoLegadoConcluida: false
+  };
+}
+
+async function lerHistoricoMes(env, mes) {
+  return (await lerJson(env, chaveHistoricoMes(mes))) || { versao: 2, mes, cursos: {} };
+}
+
+function salvarIndiceHistorico(env, indice) {
+  recalcularBytesEstimados(indice);
+  return env.PNV_MONITOR.put(KEY_HISTORICO_INDICE, JSON.stringify(indice));
 }
 
 function montarResposta(dados, estado) {
