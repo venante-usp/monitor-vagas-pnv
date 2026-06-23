@@ -180,7 +180,7 @@
       return `<article class="print-course"><h2>${escapeHtml(disciplina.codigo)} <span>— ${escapeHtml(disciplina.nome||'Disciplina')}</span></h2><ul class="print-class-list">${turmas.map(turma=>{
         const detalheVinculo=turma.vinculada?` · vinculada à T${escapeHtml(turma.vinculada)}`:'';
         const categorias=[...turma.categorias].join(', ');
-        const professores=turma.professores.length?turma.professores.map(escapeHtml).join(' · '):'não informado pelo Júpiter';
+        const professores=turma.professores.length?turma.professores.map(escapeHtml).join(', '):'não informado pelo Júpiter';
         return `<li><b>Turma ${escapeHtml(turma.codigo)}</b>${detalheVinculo} · ${escapeHtml(turma.horario)}${categorias?` · ${escapeHtml(categorias)}`:''}<br><span class="print-prof">Prof.: ${professores}</span></li>`;
       }).join('')}</ul></article>`;
     }).join('')}</div>`;
