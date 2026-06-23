@@ -1,5 +1,5 @@
 /**
- * Monitor de vagas PNV — Cloudflare Workers Free (V7: histórico anual)
+ * Monitor de vagas PNV — Cloudflare Workers Free (V8: histórico detalhado)
  *
  * - Interface estática servida pelo próprio Worker.
  * - Dados ficam no Workers KV.
