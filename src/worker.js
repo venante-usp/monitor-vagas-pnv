@@ -337,12 +337,13 @@ async function buscarDisciplinaUmaVez(codigo) {
     };
   }
 
-  const texto = textoDaPagina(resposta.html);
+  const textoEstruturado = textoEstruturadoDaPagina(resposta.html);
+  const texto = normalizarTexto(textoEstruturado.replace(/\u241F/g, ' '));
   if (!paginaConfirmaDisciplina(texto, codigo)) {
     return { codigo, tipo: 'transitorio', erro: 'Resposta intermediária ou incompleta.' };
   }
 
-  const turmas = extrairTurmas(texto);
+  const turmas = extrairTurmas(texto, textoEstruturado);
   if (turmas.length) {
     return {
       codigo,
@@ -459,18 +460,35 @@ function decodificarEntidadesHtml(valor) {
   });
 }
 
-function textoDaPagina(html) {
-  return normalizarTexto(
-    decodificarEntidadesHtml(
-      String(html || '')
-        .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
-        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
-        .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
-        .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, ' ')
-        .replace(/<\/?(?:tr|p|div|li|h\d|table|br|td|th)[^>]*>/gi, '\n')
-        .replace(/<[^>]+>/g, ' ')
-    )
+function textoEstruturadoDaPagina(html) {
+  // Mantém separadores de células (␟) e linhas para recuperar os docentes,
+  // que o Júpiter coloca em coluna separada do horário. O parser legado usa
+  // a versão achatada abaixo, portanto isso não altera a leitura de vagas.
+  const bruto = decodificarEntidadesHtml(
+    String(html || '')
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
+      .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, ' ')
+      .replace(/<br\s*\/?\s*>/gi, '\n')
+      .replace(/<\/tr\s*>/gi, '\n')
+      .replace(/<\/(?:td|th)\s*>/gi, '\u241F')
+      .replace(/<\/?(?:tr|p|div|li|h\d|table)[^>]*>/gi, '\n')
+      .replace(/<(?:td|th)\b[^>]*>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
   );
+
+  return String(bruto || '')
+    .replace(/[ \t\r\f\v]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/ *\u241F */g, '\u241F')
+    .replace(/\n{2,}/g, '\n')
+    .replace(/\u241F{2,}/g, '\u241F')
+    .trim();
+}
+
+function textoDaPagina(html) {
+  return normalizarTexto(textoEstruturadoDaPagina(html).replace(/\u241F/g, ' '));
 }
 
 function paginaConfirmaDisciplina(texto, codigo) {
@@ -494,9 +512,10 @@ function extrairNome(texto, codigo) {
   return normalizarTexto(texto.match(padrao)?.[1] || `Disciplina ${codigo}`);
 }
 
-function extrairTurmas(texto) {
+function extrairTurmas(texto, textoEstruturado = '') {
   const marcador = /C(?:[oó]|�)digo\s+da\s+Turma\s*:\s*(\d+)/gi;
   const ocorrencias = Array.from(texto.matchAll(marcador));
+  const professoresPorTurma = extrairProfessoresPorTurma(textoEstruturado);
   const turmas = [];
   const vistas = new Set();
 
@@ -510,6 +529,7 @@ function extrairTurmas(texto) {
 
     const antesDasVagas = bloco.slice(0, posicaoVagas);
     const horario = extrairHorario(antesDasVagas);
+    const professores = professoresPorTurma.get(codigo) || extrairProfessoresDoTextoPlano(antesDasVagas);
     const tipo = extrairTipoTurma(antesDasVagas);
     const teoricaVinculada = extrairTurmaTeoricaVinculada(antesDasVagas);
 
@@ -525,6 +545,7 @@ function extrairTurmas(texto) {
         tipoTurma: tipo,
         turmaTeoricaVinculada: teoricaVinculada,
         horario,
+        professores,
         dia: extrairDias(horario),
         categoria: categoria.nome,
         total: categoria.vagas,
@@ -556,6 +577,103 @@ function extrairHorario(texto) {
   const base = limite >= 0 ? bruto.slice(0, limite) : bruto;
   const horario = base.match(/(?:(?:seg|ter|qua|qui|sex|s[aá]b|dom)\s+\d{1,2}:\d{2}\s+\d{1,2}:\d{2}(?:\s*\([^)]*\))?\s*)+/i)?.[0];
   return normalizarTexto(horario || base) || 'Horário não informado';
+}
+
+
+function extrairProfessoresPorTurma(textoEstruturado) {
+  const estrutura = String(textoEstruturado || '');
+  if (!estrutura) return new Map();
+
+  const marcador = /C(?:[oó]|�)digo\s+da\s+Turma\s*:\s*(\d+)/gi;
+  const ocorrencias = Array.from(estrutura.matchAll(marcador));
+  const resultado = new Map();
+
+  for (let indice = 0; indice < ocorrencias.length; indice += 1) {
+    const inicio = ocorrencias[indice].index || 0;
+    const fim = indice + 1 < ocorrencias.length ? (ocorrencias[indice + 1].index || estrutura.length) : estrutura.length;
+    const codigo = ocorrencias[indice][1];
+    const bloco = estrutura.slice(inicio, fim);
+    const professores = extrairProfessoresDoBlocoEstruturado(bloco);
+    if (professores.length) resultado.set(codigo, professores);
+  }
+
+  return resultado;
+}
+
+function extrairProfessoresDoBlocoEstruturado(bloco) {
+  const inicioHorario = bloco.search(/Hor[aá]rio\b/i);
+  if (inicioHorario < 0) return [];
+
+  const depoisDoHorario = bloco.slice(inicioHorario);
+  const inicioVagas = depoisDoHorario.search(/Vagas\s+Inscritos\s+Pendentes\s+Matriculados/i);
+  const trecho = inicioVagas >= 0 ? depoisDoHorario.slice(0, inicioVagas) : depoisDoHorario;
+  const campos = trecho.split(/[\n\u241F]+/).map(normalizarTexto).filter(Boolean);
+  const nomes = [];
+  let aguardandoProfessor = false;
+
+  for (let campo of campos) {
+    campo = normalizarTexto(campo)
+      .replace(/^Hor[aá]rio\s*/i, '')
+      .replace(/^Prof\.?\(a\)\.?\s*/i, '');
+    if (!campo || /^(?:Hor[aá]rio|Prof\.?\(a\)?)\.?$/i.test(campo)) continue;
+
+    const horarios = Array.from(campo.matchAll(/\b(?:seg|ter|qua|qui|sex|s[aá]b|dom)\b\s+\d{1,2}:\d{2}\s+\d{1,2}:\d{2}(?:\s*\([^)]*\))?/gi));
+    if (horarios.length) {
+      const restante = normalizarTexto(campo.replace(/\b(?:seg|ter|qua|qui|sex|s[aá]b|dom)\b\s+\d{1,2}:\d{2}\s+\d{1,2}:\d{2}(?:\s*\([^)]*\))?/gi, ' '));
+      if (restante) nomes.push(restante);
+      aguardandoProfessor = !restante;
+      continue;
+    }
+
+    if (aguardandoProfessor && !/^(?:Tipo|Observa|In[ií]cio|Fim|C(?:[oó]|�)digo\s+da\s+Turma)/i.test(campo)) {
+      nomes.push(campo);
+      aguardandoProfessor = false;
+    }
+  }
+
+  return normalizarProfessores(nomes);
+}
+
+function extrairProfessoresDoTextoPlano(texto) {
+  const inicioHorario = String(texto || '').search(/Hor[aá]rio\b/i);
+  if (inicioHorario < 0) return [];
+
+  const depoisDoHorario = String(texto).slice(inicioHorario);
+  const inicioVagas = depoisDoHorario.search(/Vagas\s+Inscritos\s+Pendentes\s+Matriculados/i);
+  const trecho = inicioVagas >= 0 ? depoisDoHorario.slice(0, inicioVagas) : depoisDoHorario;
+  const marcador = /\b(?:seg|ter|qua|qui|sex|s[aá]b|dom)\b\s+\d{1,2}:\d{2}\s+\d{1,2}:\d{2}(?:\s*\([^)]*\))?/gi;
+  const horarios = Array.from(trecho.matchAll(marcador));
+  const nomes = [];
+
+  for (let indice = 0; indice < horarios.length; indice += 1) {
+    const inicio = (horarios[indice].index || 0) + horarios[indice][0].length;
+    const fim = indice + 1 < horarios.length ? (horarios[indice + 1].index || trecho.length) : trecho.length;
+    const candidato = normalizarTexto(trecho.slice(inicio, fim)
+      .replace(/^(?:Prof\.?\(a\)\.?\s*)?/i, ''));
+    if (candidato) nomes.push(candidato);
+  }
+
+  return normalizarProfessores(nomes);
+}
+
+function normalizarProfessores(nomes) {
+  const vistos = new Set();
+  const resultado = [];
+
+  for (const nomeOriginal of nomes || []) {
+    const nome = normalizarTexto(nomeOriginal)
+      .replace(/\b(?:Hor[aá]rio|Prof\.?\(a\)?)\b/gi, '')
+      .replace(/^[-–·,:;]+|[-–·,:;]+$/g, '')
+      .trim();
+    if (!nome || nome.length < 3 || /^(?:Vagas|Inscritos|Pendentes|Matriculados)$/i.test(nome)) continue;
+    const chave = nome.toLocaleLowerCase('pt-BR');
+    if (!vistos.has(chave)) {
+      vistos.add(chave);
+      resultado.push(nome);
+    }
+  }
+
+  return resultado;
 }
 
 function extrairDias(horario) {
