@@ -1,5 +1,5 @@
 /**
- * Monitor de vagas PNV — Cloudflare Workers Free (V17: docentes robustos por tabela HTML)
+ * Monitor de vagas PNV — Cloudflare Workers Free (V18: docentes por links e separação confiável)
  *
  * - Interface estática servida pelo próprio Worker.
  * - Dados ficam no Workers KV.
@@ -520,6 +520,10 @@ function extrairTurmas(texto, textoEstruturado = '', html = '') {
   // Primeiro lemos as linhas/células originais da tabela (mais preciso);
   // depois usamos o texto estruturado e, por último, o texto achatado como
   // alternativas. Assim uma leitura parcial não derruba os nomes já achados.
+  // A leitura por links preserva cada docente mesmo quando o Júpiter coloca
+  // vários nomes na mesma célula, sem vírgula ou quebra visual. É a fonte
+  // mais confiável; as demais são fallbacks para páginas antigas.
+  const professoresPorLinks = extrairProfessoresPorTurmaComLinks(html);
   const professoresHtml = extrairProfessoresPorTurmaDoHtml(html);
   const professoresEstruturados = extrairProfessoresPorTurma(textoEstruturado);
   const turmas = [];
@@ -536,6 +540,7 @@ function extrairTurmas(texto, textoEstruturado = '', html = '') {
     const antesDasVagas = bloco.slice(0, posicaoVagas);
     const horario = extrairHorario(antesDasVagas);
     const professores = escolherProfessores(
+      professoresPorLinks.get(codigo),
       professoresHtml.get(codigo),
       professoresEstruturados.get(codigo),
       extrairProfessoresDoTextoPlano(antesDasVagas)
@@ -587,6 +592,63 @@ function extrairHorario(texto) {
   const base = limite >= 0 ? bruto.slice(0, limite) : bruto;
   const horario = base.match(/(?:(?:seg|ter|qua|qui|sex|s[aá]b|dom)\s+\d{1,2}:\d{2}\s+\d{1,2}:\d{2}(?:\s*\([^)]*\))?\s*)+/i)?.[0];
   return normalizarTexto(horario || base) || 'Horário não informado';
+}
+
+/**
+ * Leitura direta por links de docentes. Em várias páginas do Júpiter os
+ * nomes ficam todos na mesma célula e são separados apenas por tags <a>;
+ * quando as tags são removidas, "Nome A" e "Nome B" viram um único texto.
+ * Aqui preservamos cada fechamento de link como separador antes de extrair.
+ */
+function extrairProfessoresPorTurmaComLinks(html) {
+  const fonte = String(html || '')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, ' ')
+    .replace(/<br\s*\/?\s*>/gi, '\n')
+    .replace(/<\/a\s*>/gi, '\u241D')
+    .replace(/<\/tr\s*>/gi, '\n')
+    .replace(/<\/(?:td|th)\s*>/gi, '\u241F')
+    .replace(/<[^>]+>/g, ' ');
+
+  const estrutura = decodificarEntidadesHtml(fonte)
+    .replace(/[ \t\r\f\v]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/ *\u241F */g, '\u241F')
+    .replace(/ *\u241D */g, '\u241D')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+
+  const marcador = /C(?:[oó]|�)digo\s+da\s+Turma\s*:\s*(\d+)/gi;
+  const ocorrencias = Array.from(estrutura.matchAll(marcador));
+  const resultado = new Map();
+
+  for (let indice = 0; indice < ocorrencias.length; indice += 1) {
+    const inicio = ocorrencias[indice].index || 0;
+    const fim = indice + 1 < ocorrencias.length
+      ? (ocorrencias[indice + 1].index || estrutura.length)
+      : estrutura.length;
+    const codigo = ocorrencias[indice][1];
+    const bloco = estrutura.slice(inicio, fim);
+    const inicioHorario = bloco.search(/Hor[aá]rio\b/i);
+    if (inicioHorario < 0) continue;
+
+    const depoisDoHorario = bloco.slice(inicioHorario);
+    const inicioVagas = depoisDoHorario.search(/Vagas\s+Inscritos\s+Pendentes\s+Matriculados/i);
+    const trecho = inicioVagas >= 0 ? depoisDoHorario.slice(0, inicioVagas) : depoisDoHorario;
+
+    // Os nomes extraídos de links ficam separados por U+241D. Também
+    // preservamos células e linhas como separadores para os layouts antigos.
+    const campos = trecho
+      .split(/[\n\u241F\u241D]+/)
+      .map(normalizarTexto)
+      .filter(Boolean);
+    const professores = extrairProfessoresDosCampos(campos);
+    if (professores.length) adicionarProfessoresAoMapa(resultado, codigo, professores);
+  }
+
+  return resultado;
 }
 
 /**
@@ -809,12 +871,21 @@ function extrairProfessoresDosCampos(campos) {
 }
 
 function escolherProfessores(...listas) {
-  // A leitura pela tabela HTML costuma ser completa. Quando ela encontra pelo
-  // menos um docente, ela é preferida para evitar duplicatas do texto achatado.
-  const primeiraValida = listas
-    .map((lista) => normalizarProfessores(lista || []))
-    .find((lista) => lista.length);
-  return primeiraValida || [];
+  // Escolhe a lista mais completa. A antiga regra aceitava a primeira lista
+  // não vazia, mesmo quando ela continha apenas um docente e a leitura por
+  // links, logo depois, tinha todos os nomes.
+  const candidatas = listas
+    .map((lista, prioridade) => ({
+      nomes: normalizarProfessores(lista || []),
+      prioridade
+    }))
+    .filter((item) => item.nomes.length);
+
+  if (!candidatas.length) return [];
+  candidatas.sort((a, b) => (
+    b.nomes.length - a.nomes.length || a.prioridade - b.prioridade
+  ));
+  return candidatas[0].nomes;
 }
 
 function normalizarProfessores(nomes) {
