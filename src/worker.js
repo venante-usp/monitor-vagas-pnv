@@ -1,5 +1,5 @@
 /**
- * Monitor de vagas PNV — Cloudflare Workers Free (V6: charset)
+ * Monitor de vagas PNV — Cloudflare Workers Free (V7: histórico anual)
  *
  * - Interface estática servida pelo próprio Worker.
  * - Dados ficam no Workers KV.
@@ -13,6 +13,8 @@ const URL_TURMA = 'https://uspdigital.usp.br/jupiterweb/obterTurma?sgldis=';
 
 const KEY_DADOS = 'monitor:latest';
 const KEY_ESTADO = 'monitor:state';
+const KEY_HISTORICO = 'monitor:history:v1';
+const DIAS_HISTORICO = 366;
 const ROTA_SINCRONIZAR_APOS_DEPLOY = '/internal/sincronizar-apos-deploy';
 
 // Configuração deliberadamente conservadora.
@@ -47,6 +49,12 @@ export default {
       // Cron Trigger do Worker, no relógio do servidor.
       const [dados, estado] = await Promise.all([lerDados(env), lerEstado(env)]);
       return respostaJson(montarResposta(dados, estado));
+    }
+
+    if (url.pathname === '/api/historico') {
+      // Histórico também é somente leitura. Os snapshots são gravados no fim
+      // de cada varredura diária completa, nunca por interação do visitante.
+      return respostaJson(await responderHistorico(url, env));
     }
 
     if (url.pathname === '/api/health') {
@@ -123,6 +131,8 @@ async function prepararScanCompleto(env, dados, estado, codigos, hojeBrt, agora)
     semOferta: 0,
     falhas: 0,
     fila: codigos.map((codigo) => ({ codigo, tentativa: 0 })),
+    codigos: [...codigos],
+    confirmadas: {},
     iniciadoEm: agora,
     concluidoEm: null
   };
@@ -176,6 +186,8 @@ async function processarLoteCompleto(env, dados, estado, agora) {
     dados.ultimaAtualizacao = agora;
     dados.ultimoErro = null;
     ordenarDisciplinas(dados.disciplinas);
+    await registrarSnapshotDiario(env, dados, full, agora);
+    full.historicoRegistradoEm = agora;
     await Promise.all([salvarDados(env, dados), salvarEstado(env, estado)]);
     return;
   }
@@ -198,6 +210,8 @@ async function processarLoteCompleto(env, dados, estado, agora) {
     full.emAndamento = false;
     full.concluidoEm = agora;
     dados.ultimaConsultaCompleta = agora;
+    await registrarSnapshotDiario(env, dados, full, agora);
+    full.historicoRegistradoEm = agora;
   }
 
   await Promise.all([salvarDados(env, dados), salvarEstado(env, estado)]);
@@ -206,6 +220,8 @@ async function processarLoteCompleto(env, dados, estado, agora) {
 function aplicarResultadoNoScan(dados, full, tarefa, resultado) {
   if (resultado.tipo === 'ofertada') {
     substituirDisciplina(dados.disciplinas, resultado.disciplina);
+    full.confirmadas ||= {};
+    full.confirmadas[tarefa.codigo] = 'ofertada';
     full.concluidas += 1;
     full.comTurmas += 1;
     return;
@@ -213,6 +229,8 @@ function aplicarResultadoNoScan(dados, full, tarefa, resultado) {
 
   if (resultado.tipo === 'sem_oferta') {
     removerDisciplina(dados.disciplinas, tarefa.codigo);
+    full.confirmadas ||= {};
+    full.confirmadas[tarefa.codigo] = 'sem_oferta';
     full.concluidas += 1;
     full.semOferta += 1;
     return;
@@ -611,6 +629,209 @@ function ordenarDisciplinas(disciplinas) {
   disciplinas.sort((a, b) => resumirPessoas(b).pessoas - resumirPessoas(a).pessoas || a.codigo.localeCompare(b.codigo));
 }
 
+
+/**
+ * Histórico anual compactado.
+ *
+ * Cada disciplina guarda segmentos de datas consecutivas com o mesmo estado.
+ * Ex.: 01–15/08 com 23 inscritos ocupa um único registro; a interface expande
+ * esse intervalo em pontos diários apenas na hora de desenhar o gráfico.
+ */
+async function registrarSnapshotDiario(env, dados, full, agora) {
+  const data = full?.data || dataBrt(agora);
+  const confirmadas = full?.confirmadas || {};
+  const codigos = Array.isArray(full?.codigos) && full.codigos.length
+    ? full.codigos
+    : Object.keys(confirmadas);
+
+  if (!codigos.length) return;
+
+  const historico = await lerHistorico(env);
+  historico.cursos ||= {};
+  historico.ultimaData = data;
+  historico.atualizadoEm = agora;
+
+  const disciplinasPorCodigo = new Map((dados.disciplinas || []).map((disciplina) => [disciplina.codigo, disciplina]));
+
+  for (const codigo of codigos) {
+    // Falha transitória não deve virar zero no gráfico. Nesse caso, o último
+    // estado confirmado permanece encerrado e a interface mostra uma lacuna.
+    const situacao = confirmadas[codigo];
+    if (!situacao) continue;
+
+    const disciplina = disciplinasPorCodigo.get(codigo);
+    const curso = historico.cursos[codigo] ||= { nome: disciplina?.nome || codigo, segmentos: [] };
+    if (disciplina?.nome) curso.nome = disciplina.nome;
+
+    let estado;
+    if (situacao === 'ofertada' && disciplina) {
+      const pessoas = resumirPessoas(disciplina);
+      estado = {
+        ofertada: true,
+        inscritos: pessoas.inscritos,
+        pendentes: pessoas.pendentes,
+        matriculados: pessoas.matriculados
+      };
+    } else if (situacao === 'sem_oferta') {
+      estado = { ofertada: false, inscritos: 0, pendentes: 0, matriculados: 0 };
+    } else {
+      continue;
+    }
+
+    inserirEstadoNoHistorico(curso.segmentos, data, estado);
+  }
+
+  limitarHistorico(historico, data);
+  await salvarHistorico(env, historico);
+}
+
+function inserirEstadoNoHistorico(segmentos, data, estado) {
+  const normalizados = Array.isArray(segmentos) ? segmentos : [];
+  let indice = normalizados.findIndex((segmento) => segmento.inicio <= data && data <= segmento.fim);
+
+  if (indice >= 0) {
+    const atual = normalizados[indice];
+    if (estadosHistoricosIguais(atual, estado)) return;
+
+    const substitutos = [];
+    if (atual.inicio < data) {
+      substitutos.push({ ...extrairEstadoHistorico(atual), inicio: atual.inicio, fim: diaAnterior(data) });
+    }
+    substitutos.push({ ...estado, inicio: data, fim: data });
+    if (atual.fim > data) {
+      substitutos.push({ ...extrairEstadoHistorico(atual), inicio: diaSeguinte(data), fim: atual.fim });
+    }
+    normalizados.splice(indice, 1, ...substitutos);
+  } else {
+    normalizados.push({ ...estado, inicio: data, fim: data });
+  }
+
+  normalizados.sort((a, b) => a.inicio.localeCompare(b.inicio));
+  mesclarSegmentosHistoricos(normalizados);
+}
+
+function extrairEstadoHistorico(segmento) {
+  return {
+    ofertada: Boolean(segmento.ofertada),
+    inscritos: Number(segmento.inscritos || 0),
+    pendentes: Number(segmento.pendentes || 0),
+    matriculados: Number(segmento.matriculados || 0)
+  };
+}
+
+function estadosHistoricosIguais(segmento, estado) {
+  const a = extrairEstadoHistorico(segmento);
+  const b = {
+    ofertada: Boolean(estado.ofertada),
+    inscritos: Number(estado.inscritos || 0),
+    pendentes: Number(estado.pendentes || 0),
+    matriculados: Number(estado.matriculados || 0)
+  };
+  return a.ofertada === b.ofertada && a.inscritos === b.inscritos && a.pendentes === b.pendentes && a.matriculados === b.matriculados;
+}
+
+function mesclarSegmentosHistoricos(segmentos) {
+  for (let indice = segmentos.length - 1; indice > 0; indice -= 1) {
+    const anterior = segmentos[indice - 1];
+    const atual = segmentos[indice];
+    if (diaSeguinte(anterior.fim) === atual.inicio && estadosHistoricosIguais(anterior, atual)) {
+      anterior.fim = atual.fim;
+      segmentos.splice(indice, 1);
+    }
+  }
+}
+
+function limitarHistorico(historico, dataReferencia) {
+  const corte = deslocarData(dataReferencia, -(DIAS_HISTORICO - 1));
+  for (const curso of Object.values(historico.cursos || {})) {
+    const mantidos = [];
+    for (const segmento of curso.segmentos || []) {
+      if (segmento.fim < corte) continue;
+      if (segmento.inicio < corte) segmento.inicio = corte;
+      mantidos.push(segmento);
+    }
+    curso.segmentos = mantidos;
+  }
+}
+
+async function responderHistorico(url, env) {
+  const historico = await lerHistorico(env);
+  const codigo = String(url.searchParams.get('codigo') || '').trim().toUpperCase();
+
+  if (!codigo) {
+    const catalogo = Object.entries(historico.cursos || {})
+      .map(([itemCodigo, curso]) => ({ codigo: itemCodigo, nome: curso.nome || itemCodigo }))
+      .sort((a, b) => a.codigo.localeCompare(b.codigo));
+    return {
+      catalogo,
+      ultimaData: historico.ultimaData || null,
+      atualizadoEm: historico.atualizadoEm || null
+    };
+  }
+
+  if (!/^PNV\d{4}$/.test(codigo)) {
+    return { codigo, erro: 'Código de disciplina inválido.', serie: [] };
+  }
+
+  const curso = historico.cursos?.[codigo];
+  if (!curso) {
+    return { codigo, nome: codigo, ultimaData: historico.ultimaData || null, serie: [] };
+  }
+
+  const diasSolicitados = limitarNumero(url.searchParams.get('dias'), 365, 30, DIAS_HISTORICO);
+  const fim = historico.ultimaData || dataBrt(Date.now());
+  const inicioSolicitado = deslocarData(fim, -(diasSolicitados - 1));
+  const primeiraData = (curso.segmentos || []).reduce((menor, segmento) => !menor || segmento.inicio < menor ? segmento.inicio : menor, null);
+  const inicio = primeiraData && primeiraData > inicioSolicitado ? primeiraData : inicioSolicitado;
+  const serie = expandirHistorico(curso.segmentos || [], inicio, fim);
+
+  return {
+    codigo,
+    nome: curso.nome || codigo,
+    inicio,
+    fim,
+    primeiraData,
+    ultimaData: historico.ultimaData || null,
+    serie
+  };
+}
+
+function expandirHistorico(segmentos, inicio, fim) {
+  const serie = [];
+  for (let data = inicio; data <= fim; data = diaSeguinte(data)) {
+    const segmento = segmentos.find((item) => item.inicio <= data && data <= item.fim);
+    if (!segmento) {
+      serie.push({ data, ofertada: null, inscritos: null, pendentes: null, matriculados: null, pessoas: null });
+      continue;
+    }
+    const inscritos = Number(segmento.inscritos || 0);
+    const pendentes = Number(segmento.pendentes || 0);
+    const matriculados = Number(segmento.matriculados || 0);
+    serie.push({
+      data,
+      ofertada: Boolean(segmento.ofertada),
+      inscritos,
+      pendentes,
+      matriculados,
+      pessoas: inscritos + pendentes + matriculados
+    });
+  }
+  return serie;
+}
+
+function deslocarData(data, quantidade) {
+  const valor = new Date(`${data}T00:00:00Z`);
+  valor.setUTCDate(valor.getUTCDate() + quantidade);
+  return valor.toISOString().slice(0, 10);
+}
+
+function diaAnterior(data) { return deslocarData(data, -1); }
+function diaSeguinte(data) { return deslocarData(data, 1); }
+function limitarNumero(valor, padrao, minimo, maximo) {
+  const numero = Number.parseInt(valor, 10);
+  return Number.isFinite(numero) ? Math.max(minimo, Math.min(maximo, numero)) : padrao;
+}
+
 function montarResposta(dados, estado) {
   const disciplinas = [...(dados.disciplinas || [])];
   ordenarDisciplinas(disciplinas);
@@ -635,11 +856,20 @@ function montarResposta(dados, estado) {
         comTurmas: estado.full.comTurmas || 0,
         semOferta: estado.full.semOferta || 0,
         falhas: estado.full.falhas || 0,
+        historicoRegistradoEm: estado.full.historicoRegistradoEm || null,
         iniciadoEm: estado.full.iniciadoEm || null,
         concluidoEm: estado.full.concluidoEm || null
       } : null
     }
   };
+}
+
+async function lerHistorico(env) {
+  return (await lerJson(env, KEY_HISTORICO)) || { versao: 1, cursos: {}, ultimaData: null, atualizadoEm: null };
+}
+
+function salvarHistorico(env, historico) {
+  return env.PNV_MONITOR.put(KEY_HISTORICO, JSON.stringify(historico));
 }
 
 async function lerDados(env) {
