@@ -1,5 +1,5 @@
 /**
- * Monitor de vagas PNV — Cloudflare Workers Free (V8: histórico detalhado)
+ * Monitor de vagas PNV — Cloudflare Workers Free (V17: docentes robustos por tabela HTML)
  *
  * - Interface estática servida pelo próprio Worker.
  * - Dados ficam no Workers KV.
@@ -343,7 +343,7 @@ async function buscarDisciplinaUmaVez(codigo) {
     return { codigo, tipo: 'transitorio', erro: 'Resposta intermediária ou incompleta.' };
   }
 
-  const turmas = extrairTurmas(texto, textoEstruturado);
+  const turmas = extrairTurmas(texto, textoEstruturado, resposta.html);
   if (turmas.length) {
     return {
       codigo,
@@ -512,10 +512,16 @@ function extrairNome(texto, codigo) {
   return normalizarTexto(texto.match(padrao)?.[1] || `Disciplina ${codigo}`);
 }
 
-function extrairTurmas(texto, textoEstruturado = '') {
+function extrairTurmas(texto, textoEstruturado = '', html = '') {
   const marcador = /C(?:[oó]|�)digo\s+da\s+Turma\s*:\s*(\d+)/gi;
   const ocorrencias = Array.from(texto.matchAll(marcador));
-  const professoresPorTurma = extrairProfessoresPorTurma(textoEstruturado);
+
+  // O Júpiter muda a estrutura da coluna de docentes entre disciplinas.
+  // Primeiro lemos as linhas/células originais da tabela (mais preciso);
+  // depois usamos o texto estruturado e, por último, o texto achatado como
+  // alternativas. Assim uma leitura parcial não derruba os nomes já achados.
+  const professoresHtml = extrairProfessoresPorTurmaDoHtml(html);
+  const professoresEstruturados = extrairProfessoresPorTurma(textoEstruturado);
   const turmas = [];
   const vistas = new Set();
 
@@ -529,7 +535,11 @@ function extrairTurmas(texto, textoEstruturado = '') {
 
     const antesDasVagas = bloco.slice(0, posicaoVagas);
     const horario = extrairHorario(antesDasVagas);
-    const professores = professoresPorTurma.get(codigo) || extrairProfessoresDoTextoPlano(antesDasVagas);
+    const professores = escolherProfessores(
+      professoresHtml.get(codigo),
+      professoresEstruturados.get(codigo),
+      extrairProfessoresDoTextoPlano(antesDasVagas)
+    );
     const tipo = extrairTipoTurma(antesDasVagas);
     const teoricaVinculada = extrairTurmaTeoricaVinculada(antesDasVagas);
 
@@ -579,6 +589,138 @@ function extrairHorario(texto) {
   return normalizarTexto(horario || base) || 'Horário não informado';
 }
 
+/**
+ * Extrai docentes a partir das linhas reais da tabela HTML. Essa é a fonte
+ * prioritária porque preserva os links e as células individuais que se perdem
+ * quando a página é convertida para texto.
+ */
+function extrairProfessoresPorTurmaDoHtml(html) {
+  const linhas = extrairLinhasDeTabelaHtml(html);
+  const resultado = new Map();
+  let codigoAtual = null;
+  let dentroDoQuadroHorario = false;
+
+  for (const campos of linhas) {
+    const textoLinha = normalizarTexto(campos.join(' '));
+    if (!textoLinha) continue;
+
+    const encontradoCodigo = textoLinha.match(/C(?:[oó]|�)digo\s+da\s+Turma\s*:\s*(\d+)/i);
+    if (encontradoCodigo) {
+      codigoAtual = encontradoCodigo[1];
+      dentroDoQuadroHorario = false;
+      if (!resultado.has(codigoAtual)) resultado.set(codigoAtual, []);
+      continue;
+    }
+
+    if (!codigoAtual) continue;
+
+    if (/Vagas\s+Inscritos\s+Pendentes\s+Matriculados/i.test(textoLinha)) {
+      dentroDoQuadroHorario = false;
+      continue;
+    }
+
+    // Cabeçalho típico: "Horário" | "Prof(a).". Em algumas páginas ambos
+    // aparecem na mesma célula; basta a presença de Horário para abrir a área.
+    if (/\bHor[aá]rio\b/i.test(textoLinha)) {
+      dentroDoQuadroHorario = true;
+      continue;
+    }
+
+    if (!dentroDoQuadroHorario) continue;
+
+    // Linhas administrativas que não pertencem à grade de horário.
+    if (/^(?:Observa(?:ç|c)[oõ]es?|In[ií]cio|Fim|Tipo\s+da\s+Turma|C(?:[oó]|�)digo\s+da\s+Turma(?:\s+Te(?:[oó]|�)rica)?|Clique\b)/i.test(textoLinha)) continue;
+
+    const professores = extrairProfessoresDaLinhaDeTabela(campos);
+    if (professores.length) adicionarProfessoresAoMapa(resultado, codigoAtual, professores);
+  }
+
+  // Remove chaves sem docente, para que os fallbacks sejam utilizados.
+  for (const [codigo, nomes] of resultado.entries()) {
+    const limpos = normalizarProfessores(nomes);
+    if (limpos.length) resultado.set(codigo, limpos);
+    else resultado.delete(codigo);
+  }
+
+  return resultado;
+}
+
+function extrairLinhasDeTabelaHtml(html) {
+  const fonte = String(html || '')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, ' ');
+
+  const linhas = [];
+  const regexLinha = /<tr\b[^>]*>([\s\S]*?)<\/tr\s*>/gi;
+  for (const encontradoLinha of fonte.matchAll(regexLinha)) {
+    const campos = [];
+    const regexCelula = /<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]\s*>/gi;
+    for (const encontradoCelula of encontradoLinha[1].matchAll(regexCelula)) {
+      const valor = textoDaCelulaHtml(encontradoCelula[1]);
+      if (valor) campos.push(valor);
+    }
+    if (campos.length) linhas.push(campos);
+  }
+  return linhas;
+}
+
+function textoDaCelulaHtml(html) {
+  // O Júpiter costuma colocar cada docente em um link. Ao trocar </a> por um
+  // separador antes de retirar as tags, evitamos que "Nome ANome B" vire uma
+  // única string quando duas âncoras aparecem lado a lado.
+  const bruto = String(html || '')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<br\s*\/?\s*>/gi, '\u241D')
+    .replace(/<\/a\s*>/gi, '\u241D')
+    .replace(/<[^>]+>/g, ' ');
+
+  return decodificarEntidadesHtml(bruto)
+    .replace(/[ \t\r\n\f\v]+/g, ' ')
+    .replace(/\s*\u241D\s*/g, '\u241D')
+    .replace(/\u241D{2,}/g, '\u241D')
+    .trim();
+}
+
+function extrairProfessoresDaLinhaDeTabela(campos) {
+  const nomes = [];
+  for (const campo of campos || []) {
+    for (const parte of String(campo || '').split(/\u241D|\s*[;|]\s*/)) {
+      const nome = limparPossivelProfessor(parte);
+      if (pareceNomeDeProfessor(nome)) nomes.push(nome);
+    }
+  }
+  return normalizarProfessores(nomes);
+}
+
+function limparPossivelProfessor(valor) {
+  return normalizarTexto(String(valor || '')
+    .replace(/^\s*Hor[aá]rio\s*(?:Prof\.?\(a\)?\.?\s*)?/i, ' ')
+    .replace(/^\s*Prof\.?\(a\)?\.?\s*/i, ' ')
+    .replace(/\b(?:seg|ter|qua|qui|sex|s[aá]b|dom)\b/gi, ' ')
+    .replace(/\b\d{1,2}:\d{2}\b/g, ' ')
+    .replace(/\(\s*R\s*\)/gi, ' ')
+    .replace(/\b(?:Hor[aá]rio|Prof\.?\(a\)?\.?|Sala|Local)\b\s*:?/gi, ' ')
+    .replace(/^[-–—·,:;]+|[-–—·,:;]+$/g, ' '));
+}
+
+function pareceNomeDeProfessor(valor) {
+  const nome = normalizarTexto(valor);
+  if (!nome || nome.length < 5 || /\d/.test(nome)) return false;
+  if (/^(?:Vagas|Inscritos|Pendentes|Matriculados|Observa(?:ç|c)[oõ]es?|In[ií]cio|Fim|Tipo\s+da\s+Turma|Te[oó]rica|Pr[aá]tica|Vinculada|C(?:[oó]|�)digo\s+da\s+Turma|Clique\b)/i.test(nome)) return false;
+  if (/\b(?:seg|ter|qua|qui|sex|s[aá]b|dom)\b/i.test(nome)) return false;
+
+  // Docentes no Júpiter são nomes completos. Exigir dois termos evita que
+  // campos como "R" ou "Laboratório" entrem como professor.
+  const palavras = nome.match(/[A-Za-zÀ-ÖØ-öø-ÿ]{2,}/g) || [];
+  return palavras.length >= 2;
+}
+
+function adicionarProfessoresAoMapa(mapa, codigo, nomes) {
+  const anteriores = mapa.get(codigo) || [];
+  mapa.set(codigo, normalizarProfessores([...anteriores, ...(nomes || [])]));
+}
 
 function extrairProfessoresPorTurma(textoEstruturado) {
   const estrutura = String(textoEstruturado || '');
@@ -594,44 +736,26 @@ function extrairProfessoresPorTurma(textoEstruturado) {
     const codigo = ocorrencias[indice][1];
     const bloco = estrutura.slice(inicio, fim);
     const professores = extrairProfessoresDoBlocoEstruturado(bloco);
-    if (professores.length) resultado.set(codigo, professores);
+    if (professores.length) adicionarProfessoresAoMapa(resultado, codigo, professores);
   }
 
   return resultado;
 }
 
 function extrairProfessoresDoBlocoEstruturado(bloco) {
-  const inicioHorario = bloco.search(/Hor[aá]rio\b/i);
+  const inicioHorario = String(bloco || '').search(/Hor[aá]rio\b/i);
   if (inicioHorario < 0) return [];
 
-  const depoisDoHorario = bloco.slice(inicioHorario);
+  const depoisDoHorario = String(bloco).slice(inicioHorario);
   const inicioVagas = depoisDoHorario.search(/Vagas\s+Inscritos\s+Pendentes\s+Matriculados/i);
   const trecho = inicioVagas >= 0 ? depoisDoHorario.slice(0, inicioVagas) : depoisDoHorario;
-  const campos = trecho.split(/[\n\u241F]+/).map(normalizarTexto).filter(Boolean);
-  const nomes = [];
-  let aguardandoProfessor = false;
 
-  for (let campo of campos) {
-    campo = normalizarTexto(campo)
-      .replace(/^Hor[aá]rio\s*/i, '')
-      .replace(/^Prof\.?\(a\)\.?\s*/i, '');
-    if (!campo || /^(?:Hor[aá]rio|Prof\.?\(a\)?)\.?$/i.test(campo)) continue;
+  const campos = trecho
+    .split(/[\n\u241F]+/)
+    .map(normalizarTexto)
+    .filter(Boolean);
 
-    const horarios = Array.from(campo.matchAll(/\b(?:seg|ter|qua|qui|sex|s[aá]b|dom)\b\s+\d{1,2}:\d{2}\s+\d{1,2}:\d{2}(?:\s*\([^)]*\))?/gi));
-    if (horarios.length) {
-      const restante = normalizarTexto(campo.replace(/\b(?:seg|ter|qua|qui|sex|s[aá]b|dom)\b\s+\d{1,2}:\d{2}\s+\d{1,2}:\d{2}(?:\s*\([^)]*\))?/gi, ' '));
-      if (restante) nomes.push(restante);
-      aguardandoProfessor = !restante;
-      continue;
-    }
-
-    if (aguardandoProfessor && !/^(?:Tipo|Observa|In[ií]cio|Fim|C(?:[oó]|�)digo\s+da\s+Turma)/i.test(campo)) {
-      nomes.push(campo);
-      aguardandoProfessor = false;
-    }
-  }
-
-  return normalizarProfessores(nomes);
+  return extrairProfessoresDosCampos(campos);
 }
 
 function extrairProfessoresDoTextoPlano(texto) {
@@ -641,19 +765,56 @@ function extrairProfessoresDoTextoPlano(texto) {
   const depoisDoHorario = String(texto).slice(inicioHorario);
   const inicioVagas = depoisDoHorario.search(/Vagas\s+Inscritos\s+Pendentes\s+Matriculados/i);
   const trecho = inicioVagas >= 0 ? depoisDoHorario.slice(0, inicioVagas) : depoisDoHorario;
-  const marcador = /\b(?:seg|ter|qua|qui|sex|s[aá]b|dom)\b\s+\d{1,2}:\d{2}\s+\d{1,2}:\d{2}(?:\s*\([^)]*\))?/gi;
-  const horarios = Array.from(trecho.matchAll(marcador));
-  const nomes = [];
 
-  for (let indice = 0; indice < horarios.length; indice += 1) {
-    const inicio = (horarios[indice].index || 0) + horarios[indice][0].length;
-    const fim = indice + 1 < horarios.length ? (horarios[indice + 1].index || trecho.length) : trecho.length;
-    const candidato = normalizarTexto(trecho.slice(inicio, fim)
-      .replace(/^(?:Prof\.?\(a\)\.?\s*)?/i, ''));
-    if (candidato) nomes.push(candidato);
+  const campos = trecho
+    .replace(/\b(?:seg|ter|qua|qui|sex|s[aá]b|dom)\b\s+\d{1,2}:\d{2}\s+\d{1,2}:\d{2}(?:\s*\(R\))?/gi, (parte) => `\n${parte}\n`)
+    .split(/\n+/)
+    .map(normalizarTexto)
+    .filter(Boolean);
+
+  return extrairProfessoresDosCampos(campos);
+}
+
+function extrairProfessoresDosCampos(campos) {
+  const nomes = [];
+  let encontrouHorario = false;
+
+  for (let campoOriginal of campos || []) {
+    let campo = normalizarTexto(campoOriginal);
+    if (!campo) continue;
+
+    if (/^(?:Hor[aá]rio|Prof\.?\(a\)?\.?)$/i.test(campo)) continue;
+    if (/^(?:Tipo\s+da\s+Turma|Observa(?:ç|c)[oõ]es?|In[ií]cio|Fim|C(?:[oó]|�)digo\s+da\s+Turma(?:\s+Te(?:[oó]|�)rica)?|Vagas|Inscritos|Pendentes|Matriculados)\b/i.test(campo)) break;
+
+    const possuiDia = /\b(?:seg|ter|qua|qui|sex|s[aá]b|dom)\b/i.test(campo);
+    const possuiHorario = /\b\d{1,2}:\d{2}\b/.test(campo);
+
+    if (possuiDia || (encontrouHorario && possuiHorario)) {
+      encontrouHorario = true;
+      const restante = limparPossivelProfessor(campo);
+      if (pareceNomeDeProfessor(restante)) nomes.push(restante);
+      continue;
+    }
+
+    if (!encontrouHorario) continue;
+    if (/^(?:\d{1,2}:\d{2}|\(R\)|\([^)]{1,8}\))$/i.test(campo)) continue;
+
+    for (const parte of campo.split(/\u241D|\s*[;|]\s*/)) {
+      const nome = limparPossivelProfessor(parte);
+      if (pareceNomeDeProfessor(nome)) nomes.push(nome);
+    }
   }
 
   return normalizarProfessores(nomes);
+}
+
+function escolherProfessores(...listas) {
+  // A leitura pela tabela HTML costuma ser completa. Quando ela encontra pelo
+  // menos um docente, ela é preferida para evitar duplicatas do texto achatado.
+  const primeiraValida = listas
+    .map((lista) => normalizarProfessores(lista || []))
+    .find((lista) => lista.length);
+  return primeiraValida || [];
 }
 
 function normalizarProfessores(nomes) {
@@ -661,15 +822,17 @@ function normalizarProfessores(nomes) {
   const resultado = [];
 
   for (const nomeOriginal of nomes || []) {
-    const nome = normalizarTexto(nomeOriginal)
-      .replace(/\b(?:Hor[aá]rio|Prof\.?\(a\)?)\b/gi, '')
-      .replace(/^[-–·,:;]+|[-–·,:;]+$/g, '')
-      .trim();
-    if (!nome || nome.length < 3 || /^(?:Vagas|Inscritos|Pendentes|Matriculados)$/i.test(nome)) continue;
-    const chave = nome.toLocaleLowerCase('pt-BR');
-    if (!vistos.has(chave)) {
-      vistos.add(chave);
-      resultado.push(nome);
+    for (const parte of String(nomeOriginal || '').split(/\u241D|\s*[;|]\s*/)) {
+      const nome = normalizarTexto(parte)
+        .replace(/\b(?:Hor[aá]rio|Prof\.?\(a\)?)\b/gi, '')
+        .replace(/^[-–—·,:;]+|[-–—·,:;]+$/g, '')
+        .trim();
+      if (!pareceNomeDeProfessor(nome)) continue;
+      const chave = nome.toLocaleLowerCase('pt-BR');
+      if (!vistos.has(chave)) {
+        vistos.add(chave);
+        resultado.push(nome);
+      }
     }
   }
 
