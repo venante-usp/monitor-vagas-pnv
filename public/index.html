@@ -94,7 +94,7 @@
     </form>
   </dialog>
 <script>
-  let disciplinas=[],desativadas=[],meta={},filtro='todos',view='monitor',historyCatalog=[],historyLoaded=false,historyCode='',historyDays='365',historyMetric='detalhado',historySelectedDate='',resizeTimer=null;
+  let disciplinas=[],desativadas=[],curriculo={versao:1,atualizadoEm:null,porCodigo:{},fontes:[]},meta={},filtro='todos',view='monitor',historyCatalog=[],historyLoaded=false,historyCode='',historyDays='365',historyMetric='detalhado',historySelectedDate='',resizeTimer=null;
   const brt={timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false};
   const fmtDate=new Intl.DateTimeFormat('pt-BR',{timeZone:'UTC',day:'2-digit',month:'short',year:'numeric'});
   const fmtMonth=new Intl.DateTimeFormat('pt-BR',{timeZone:'UTC',month:'short'});
@@ -192,15 +192,6 @@
     return [...mapa.values()].sort((a,b)=>a.codigo.localeCompare(b.codigo)||a.horario.localeCompare(b.horario));
   }
   function dataImpressao(){return new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'medium',timeStyle:'short'}).format(new Date())}
-  const GRUPOS_DOCENTES_IMPRESSAO=[
-    {titulo:'1º ano · 2º semestre',codigos:['PNV1120']},
-    {titulo:'2º ano · 4º semestre',codigos:['PNV1221','PNV1222']},
-    {titulo:'3º ano · 6º semestre',codigos:['PNV3321','PNV3322','PNV3323','PNV3324','PNV3392','PNV3396']},
-    {titulo:'4º ano · 8º semestre',codigos:['PNV3415','PNV3421','PNV3425']},
-    {titulo:'5º ano · 10º semestre',codigos:['PNV3510','PNV3511','PNV3514','PNV3520','PNV3523']},
-    {titulo:'Optativas',codigos:['PNV1560']},
-    {titulo:'Outros cursos',codigos:['PNV3426']}
-  ];
   function nomeSemCodigo(nome,codigo){
     return String(nome||'Disciplina').replace(new RegExp(`^\\s*${String(codigo||'').replace(/[.*+?^${}()|[\\]\\]/g,'\\$&')}\\s*[-–—:]?\\s*`,'i'),'').trim()||String(nome||'Disciplina');
   }
@@ -213,22 +204,44 @@
     }
     return out;
   }
-  function montarPainelDocentesImpressao(){
-    const porCodigo=new Map(disciplinas.map(d=>[d.codigo,d]));
-    const usados=new Set();
-    const grupos=[];
-    for(const grupo of GRUPOS_DOCENTES_IMPRESSAO){
-      const cursos=grupo.codigos.map(c=>porCodigo.get(c)).filter(Boolean);
-      cursos.forEach(c=>usados.add(c.codigo));
-      if(cursos.length)grupos.push({titulo:grupo.titulo,cursos});
+  function categoriasDaDisciplina(disciplina){
+    return new Set((disciplina.turmas||[]).map(t=>String(t.categoria||'').toLocaleLowerCase('pt-BR')).filter(Boolean));
+  }
+  function tituloCurricular(item){
+    const rotulo=String(item?.rotulo||'').trim();
+    if(rotulo)return rotulo;
+    const periodo=Number(item?.periodo||0);
+    return Number.isFinite(periodo)&&periodo>0?`${Math.ceil(periodo/2)}º ano · ${periodo}º semestre`:'';
+  }
+  function obterGrupoDocentes(disciplina){
+    const item=curriculo?.porCodigo?.[disciplina.codigo]||null;
+    const titulo=tituloCurricular(item);
+    if(titulo){
+      const periodo=Number(item?.periodo||99);
+      return {chave:`curricular:${periodo}:${titulo}`,titulo,ordem:Number.isFinite(periodo)?periodo:99,tipo:'curricular'};
     }
-    const demais=disciplinas.filter(d=>!usados.has(d.codigo)).sort((a,b)=>a.codigo.localeCompare(b.codigo));
-    if(demais.length)grupos.push({titulo:'Demais disciplinas',cursos:demais});
+    const categorias=categoriasDaDisciplina(disciplina);
+    if([...categorias].some(c=>/optativa/.test(c)))return {chave:'optativas',titulo:'Optativas',ordem:900,tipo:'especial'};
+    return {chave:'sem-classificacao',titulo:'Sem classificação curricular no Júpiter',ordem:999,tipo:'especial'};
+  }
+  function gruposDocentesDinamicos(){
+    const mapa=new Map();
+    for(const disciplina of disciplinas){
+      const grupo=obterGrupoDocentes(disciplina);
+      if(!mapa.has(grupo.chave))mapa.set(grupo.chave,{...grupo,cursos:[]});
+      mapa.get(grupo.chave).cursos.push(disciplina);
+    }
+    return [...mapa.values()]
+      .map(grupo=>({...grupo,cursos:grupo.cursos.sort((a,b)=>a.codigo.localeCompare(b.codigo))}))
+      .sort((a,b)=>a.ordem-b.ordem||a.titulo.localeCompare(b.titulo,'pt-BR'));
+  }
+  function montarPainelDocentesImpressao(){
+    const grupos=gruposDocentesDinamicos();
     return `<aside class="print-faculty"><h2 class="print-faculty-title">DOCENTES</h2>${grupos.map(grupo=>`<section class="print-faculty-group"><h2>${escapeHtml(grupo.titulo)}</h2>${grupo.cursos.map(d=>{
       const professores=professoresDaDisciplina(d);
       const textoProf=professores.length?professores.join(', '):'ainda não sincronizado';
       return `<p class="print-faculty-course"><b>${escapeHtml(d.codigo)}</b> — ${escapeHtml(nomeSemCodigo(d.nome,d.codigo))}<br><span>Prof.: ${escapeHtml(textoProf)}</span></p>`;
-    }).join('')}</section>`).join('')}<p class="print-faculty-note">Relação gerada com os dados de turmas e docentes atualmente registrados no Júpiter.</p></aside>`;
+    }).join('')}</section>`).join('')}<p class="print-faculty-note">Classificação curricular lida automaticamente das habilitações naval atual e históricas do Júpiter.</p></aside>`;
   }
   function slotsImpressaoPorDia(){
     const base=construirGradeSimplificada();
@@ -337,7 +350,20 @@
   const DOCX_HORARIOS=[{inicio:450,fim:500},{inicio:500,fim:550},{inicio:560,fim:610},{inicio:610,fim:660},{inicio:670,fim:720},{inicio:720,fim:770},{inicio:790,fim:840},{inicio:840,fim:890},{inicio:900,fim:950},{inicio:950,fim:1000},{inicio:1010,fim:1060},{inicio:1070,fim:1110}];
   function montarTabelaGradeDocx(){const base=construirGradeSimplificada(),dias=GRADE_DAYS.filter(d=>base.some(s=>s.dia===d.key));if(!dias.length)return docxParagraph(docxRun('Nenhuma turma com horário reconhecido está disponível.',{size:18,color:'64748B'}));const larguras=[790,...dias.map(()=>Math.floor(10650/dias.length))];const cabecalho=docxRow([docxCell(docxTextoCelula([{text:'HORÁRIO',bold:true,size:13,align:'center'}],{align:'center'}),{width:larguras[0],fill:'F1F5F9',vAlign:'center'}),...dias.map((dia,i)=>docxCell(docxTextoCelula([{text:dia.name.toUpperCase(),bold:true,size:13,align:'center'}],{align:'center'}),{width:larguras[i+1],fill:'F1F5F9',vAlign:'center'}))],{height:300,header:true});const linhas=DOCX_HORARIOS.map(bloco=>{const horario=`${textoHora(bloco.inicio)}\n${textoHora(bloco.fim)}`.split('\n').map((text,i)=>({text,bold:i===0,size:12,align:'center',color:i===0?'9B3328':'475569'}));const celulas=[docxCell(docxTextoCelula(horario,{align:'center'}),{width:larguras[0],fill:'F8FAFC',vAlign:'center'})];for(let i=0;i<dias.length;i++){const eventos=encontrosPorFaixaDocx(dias[i].key,bloco.inicio,bloco.fim);if(!eventos.length){celulas.push(docxCell(docxParagraph('',{}),{width:larguras[i+1],fill:'0B73B5',vAlign:'center'}));continue}const conteudo=[];for(const evento of eventos){conteudo.push(docxParagraph(docxRun(`${evento.codigo} · ${[...evento.turmas].map(t=>`T${t}`).join(', ')}`,{bold:true,size:eventos.length>2?11:12,color:'112B60'}),{align:'center',spaceAfter:20,keepLines:true}));}celulas.push(docxCell(conteudo.join(''),{width:larguras[i+1],fill:'FFFFFF',vAlign:'center'}));}return docxRow(celulas,{height:eventosAlturaDocx(bloco)})});return docxTable([cabecalho,...linhas],larguras,{borderColor:'172033',borderSize:5})}
   function eventosAlturaDocx(bloco){return bloco.fim-bloco.inicio>=50?560:480}
-  function montarPainelDocentesDocx(){const porCodigo=new Map(disciplinas.map(d=>[d.codigo,d])),usados=new Set(),partes=[docxParagraph(docxRun('DOCENTES',{bold:true,size:16,color:'111111'}),{align:'center',spaceAfter:80,keepNext:true})];for(const grupo of GRUPOS_DOCENTES_IMPRESSAO){const cursos=grupo.codigos.map(c=>porCodigo.get(c)).filter(Boolean);cursos.forEach(c=>usados.add(c.codigo));if(!cursos.length)continue;partes.push(docxParagraph(docxRun(grupo.titulo,{bold:true,size:13,color:'A33227'}),{spaceBefore:45,spaceAfter:25,keepNext:true}));for(const curso of cursos){const professores=professoresDaDisciplina(curso);const linha=`${curso.codigo} — ${nomeSemCodigo(curso.nome,curso.codigo)}; Prof.: ${professores.length?professores.join(', '):'ainda não sincronizado'}`;partes.push(docxParagraph(docxRun(linha,{size:10,color:'172033'}),{spaceAfter:20,keepLines:true}));}}const demais=disciplinas.filter(d=>!usados.has(d.codigo)).sort((a,b)=>a.codigo.localeCompare(b.codigo));if(demais.length){partes.push(docxParagraph(docxRun('Demais disciplinas',{bold:true,size:13,color:'A33227'}),{spaceBefore:45,spaceAfter:25,keepNext:true}));for(const curso of demais){const professores=professoresDaDisciplina(curso);partes.push(docxParagraph(docxRun(`${curso.codigo} — ${nomeSemCodigo(curso.nome,curso.codigo)}; Prof.: ${professores.length?professores.join(', '):'ainda não sincronizado'}`,{size:10,color:'172033'}),{spaceAfter:20,keepLines:true}));}}partes.push(docxParagraph(docxRun('Dados de turmas e docentes registrados pelo Júpiter no momento da geração.',{size:9,color:'64748B',italic:true}),{spaceBefore:50}));return partes.join('')}
+  function montarPainelDocentesDocx(){
+    const grupos=gruposDocentesDinamicos();
+    const partes=[docxParagraph(docxRun('DOCENTES',{bold:true,size:16,color:'111111'}),{align:'center',spaceAfter:80,keepNext:true})];
+    for(const grupo of grupos){
+      partes.push(docxParagraph(docxRun(grupo.titulo,{bold:true,size:13,color:'A33227'}),{spaceBefore:45,spaceAfter:25,keepNext:true}));
+      for(const curso of grupo.cursos){
+        const professores=professoresDaDisciplina(curso);
+        const linha=`${curso.codigo} — ${nomeSemCodigo(curso.nome,curso.codigo)}; Prof.: ${professores.length?professores.join(', '):'ainda não sincronizado'}`;
+        partes.push(docxParagraph(docxRun(linha,{size:10,color:'172033'}),{spaceAfter:20,keepLines:true}));
+      }
+    }
+    partes.push(docxParagraph(docxRun('Classificação curricular lida automaticamente das habilitações naval atual e históricas do Júpiter.',{size:9,color:'64748B',italic:true}),{spaceBefore:50}));
+    return partes.join('');
+  }
   function montarListaDocx(){const partes=[];for(const disciplina of [...disciplinas].sort((a,b)=>a.codigo.localeCompare(b.codigo))){partes.push(docxParagraph(docxRun(`${disciplina.codigo} — ${nomeSemCodigo(disciplina.nome,disciplina.codigo)}`,{bold:true,size:20,color:'102C62'}),{spaceBefore:110,spaceAfter:40,keepNext:true}));for(const turma of turmasFisicasParaImpressao(disciplina)){const categorias=[...turma.categorias].join(', ');const professores=turma.professores.length?turma.professores:professoresDaDisciplina(disciplina);const vinculo=turma.vinculada?` · vinculada à T${turma.vinculada}`:'';partes.push(docxParagraph(docxRun(`Turma ${turma.codigo}${vinculo} · ${turma.horario}${categorias?` · ${categorias}`:''}`,{bold:true,size:15,color:'253B68'}),{spaceAfter:8,keepLines:true}));partes.push(docxParagraph(docxRun(`Docentes: ${professores.length?professores.join(', '):'ainda não sincronizado'}`,{size:14,color:'53657F'}),{spaceAfter:28,keepLines:true}));}}return partes.join('')}
   function montarDocumentoDocx(titulo,periodo){const ultima=meta.ultimaAtualizacao?formatTime(meta.ultimaAtualizacao):'—';const gerado=dataImpressao();const tituloFinal=(titulo||'Grade Horária Graduação - PNV').trim();const periodoFinal=(periodo||semestrePadraoDocx()).trim();const cabecalho=[docxParagraph(docxRun(tituloFinal,{bold:true,size:30,color:'111111'}),{align:'center',spaceAfter:30,keepNext:true}),docxParagraph(docxRun(periodoFinal,{bold:true,size:18,color:'A33227'}),{align:'center',spaceAfter:55,keepNext:true}),docxParagraph(docxRun(`Gerado em ${gerado} · Última atualização dos dados: ${ultima}`,{size:11,color:'64748B'}),{align:'center',spaceAfter:90})].join('');const grade=montarTabelaGradeDocx();const docentes=montarPainelDocentesDocx();const primeiraPagina=docxTable([docxRow([docxCell(`${grade}<w:p/>`,{width:11440,vAlign:'top'}),docxCell(docentes,{width:4300,vAlign:'top'})])],[11440,4300],{borderColor:'172033',borderSize:7});const lista=[docxParagraph('<w:r><w:br w:type="page"/></w:r>',{}),docxParagraph(docxRun('Disciplinas PNV ofertadas',{bold:true,size:28,color:'111111'}),{spaceAfter:25,keepNext:true}),docxParagraph(docxRun(`Turmas, horários e docentes informados pelo Júpiter · ${gerado}`,{size:12,color:'53657F'}),{spaceAfter:65}),montarListaDocx()].join('');const body=`${cabecalho}${primeiraPagina}${lista}<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="360" w:right="360" w:bottom="360" w:left="360" w:header="180" w:footer="180" w:gutter="0"/></w:sectPr>`;return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${DOCX_NS}><w:body>${body}</w:body></w:document>`}
   function arquivosDocx(titulo,periodo){const agora=new Date().toISOString();return [{nome:'[Content_Types].xml',texto:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>'},{nome:'_rels/.rels',texto:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>'},{nome:'word/_rels/document.xml.rels',texto:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'},{nome:'word/styles.xml',texto:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="18"/><w:lang w:val="pt-BR"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style></w:styles>'},{nome:'docProps/core.xml',texto:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${docxEsc(titulo||'Grade Horária Graduação - PNV')}</dc:title><dc:creator>Monitor de vagas PNV</dc:creator><cp:lastModifiedBy>Monitor de vagas PNV</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${agora}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${agora}</dcterms:modified></cp:coreProperties>`},{nome:'docProps/app.xml',texto:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Monitor de vagas PNV</Application></Properties>'},{nome:'word/document.xml',texto:montarDocumentoDocx(titulo,periodo)}]}
@@ -349,7 +375,7 @@
   function human(ms){if(ms==null||ms<0)return '—';const s=Math.ceil(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;if(h)return `${h}h ${String(m).padStart(2,'0')}m`;if(m)return `${m}m ${String(ss).padStart(2,'0')}s`;return `${ss}s`}
   function updateTimers(){const now=Date.now();document.getElementById('clock').textContent=new Intl.DateTimeFormat('pt-BR',brt).format(new Date(now));document.getElementById('short').textContent=human((meta.proximaAtualizacaoCurta||0)-now);document.getElementById('full').textContent=human((meta.proximaConsultaCompleta||0)-now)}
   function refreshMeta(){const full=meta.fullScan;const primeiroUso=!meta.ultimaAtualizacao&&!full;document.getElementById('stamp').textContent=meta.ultimaAtualizacao?`Última atualização: ${formatTime(meta.ultimaAtualizacao)}`:meta.inicializacaoEmAndamento?'Iniciando a primeira consulta…':'Sem dados armazenados';document.getElementById('serverStatus').textContent=full?.emAndamento?`Sincronização diária: ${full.concluidas}/${full.total}`:primeiroUso?(meta.inicializacaoEmAndamento?'Primeira consulta em andamento':'Aguardando primeira consulta'):'Monitor ativo';document.getElementById('dot').className='dot '+(full?.emAndamento||meta.inicializacaoEmAndamento?'work':'');document.getElementById('shortDetail').textContent=full?.emAndamento?'retoma após a sincronização':primeiroUso?'primeira sincronização':'disciplinas ofertadas';document.getElementById('fullDetail').textContent=full?.emAndamento?`${full.concluidas}/${full.total} consultadas`:primeiroUso?'lista atual do Júpiter':'lista atual do Júpiter';const note=document.getElementById('notice');if(meta.ultimoErro?.mensagem){note.textContent=meta.ultimoErro.mensagem;note.classList.add('show')}else note.classList.remove('show')}
-  async function load(){try{const r=await fetch('/api/monitor',{cache:'no-store'});if(!r.ok)throw new Error('Não foi possível ler os dados do monitor.');const data=await r.json();disciplinas=data.disciplinas||[];desativadas=data.desativadas||[];meta=data.meta||{};refreshMeta();render();if(view==='grade')renderGrade();if(view==='desativadas')renderDesativadas();updateTimers()}catch(e){document.getElementById('dot').className='dot err';document.getElementById('serverStatus').textContent='Dados indisponíveis';document.getElementById('content').innerHTML=`<div class="empty">${escapeHtml(e.message)}</div>`}}
+  async function load(){try{const r=await fetch('/api/monitor',{cache:'no-store'});if(!r.ok)throw new Error('Não foi possível ler os dados do monitor.');const data=await r.json();disciplinas=data.disciplinas||[];desativadas=data.desativadas||[];curriculo=data.curriculo||{versao:1,atualizadoEm:null,porCodigo:{},fontes:[]};meta=data.meta||{};refreshMeta();render();if(view==='grade')renderGrade();if(view==='desativadas')renderDesativadas();updateTimers()}catch(e){document.getElementById('dot').className='dot err';document.getElementById('serverStatus').textContent='Dados indisponíveis';document.getElementById('content').innerHTML=`<div class="empty">${escapeHtml(e.message)}</div>`}}
   async function carregarCatalogoHistorico(){if(historyLoaded)return;const root=document.getElementById('historyBody');root.className='history-loading';root.textContent='Carregando histórico armazenado…';try{const r=await fetch('/api/historico',{cache:'no-store'});if(!r.ok)throw new Error('Não foi possível carregar o histórico.');const data=await r.json();historyCatalog=data.catalogo||[];historyLoaded=true;const select=document.getElementById('historyCourse');if(!historyCatalog.length){select.innerHTML='<option>Nenhum snapshot diário ainda</option>';select.disabled=true;root.className='history-loading';root.textContent='O histórico começará após a primeira consulta completa desta versão terminar.';return}select.disabled=false;select.innerHTML=historyCatalog.map(c=>`<option value="${escapeHtml(c.codigo)}">${escapeHtml(c.codigo)} — ${escapeHtml(c.nome)}</option>`).join('');const current=disciplinas[0]?.codigo;historyCode=historyCatalog.some(c=>c.codigo===current)?current:historyCatalog[0].codigo;select.value=historyCode;await carregarSerieHistorica()}catch(e){root.className='history-loading';root.textContent=e.message}}
   async function carregarSerieHistorica(){const root=document.getElementById('historyBody');if(!historyCode)return;root.className='history-loading';root.textContent='Desenhando evolução da disciplina…';try{const r=await fetch(`/api/historico?codigo=${encodeURIComponent(historyCode)}&dias=${historyDays}`,{cache:'no-store'});if(!r.ok)throw new Error('Não foi possível carregar a série histórica.');const data=await r.json();renderHistory(data)}catch(e){root.className='history-loading';root.textContent=e.message}}
   const HISTORY_METRICS={pessoas:{label:'Pessoas registradas',color:'#132c63'},inscritos:{label:'Inscritos',color:'#3d67d5'},pendentes:{label:'Pendentes',color:'#c57b13'},matriculados:{label:'Matriculados',color:'#157a4b'}};
