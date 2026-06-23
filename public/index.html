@@ -306,7 +306,7 @@
   function prepararDocumentoImpressao(){
     const root=document.getElementById('printDocument');
     const ultima=meta.ultimaAtualizacao?formatTime(meta.ultimaAtualizacao):'—';
-    root.innerHTML=`<section class="print-page print-grade-page"><header class="print-page-title"><h1>Grade Horária Graduação · PNV</h1><p>Disciplinas ofertadas no Júpiter · horários vigentes</p></header>${montarGradeImpressaoVisual({alturaMm:154})}<p class="print-note">Gerado em ${escapeHtml(dataImpressao())} · Última atualização dos dados: ${escapeHtml(ultima)}.</p></section>`;
+    root.innerHTML=`<section class="print-page print-grade-page"><header class="print-page-title"><h1>Grade Horária Graduação · PNV</h1><p>Disciplinas ofertadas no Júpiter · horários vigentes</p></header><div class="print-grade-shell">${montarGradeImpressaoVisual()}${montarPainelDocentesImpressao()}</div><p class="print-note">Gerado em ${escapeHtml(dataImpressao())} · Última atualização dos dados: ${escapeHtml(ultima)} · Cada bloco representa uma disciplina e sua turma; choques de horário aparecem lado a lado.</p></section><section class="print-page print-list-page"><header class="print-list-head"><div><h1>Disciplinas PNV ofertadas</h1><p>Relação de turmas, horários e docentes informados pelo Júpiter.</p></div><div class="print-stamp">Gerado em ${escapeHtml(dataImpressao())}<br>Última atualização: ${escapeHtml(ultima)}</div></header>${montarListaImpressaoDisciplinas()}</section>`;
   }
   function imprimirGrade(){prepararDocumentoImpressao();requestAnimationFrame(()=>window.print())}
 
