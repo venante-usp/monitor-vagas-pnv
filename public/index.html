@@ -21,50 +21,37 @@
     .deactivated{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 6px 17px rgba(20,38,77,.045);overflow:hidden}.deactivated-top{padding:19px 20px;border-bottom:1px solid var(--line)}.deactivated-title{font-size:17px;font-weight:820;letter-spacing:-.02em}.deactivated-sub{margin-top:3px;color:var(--muted);font-size:12px}.deactivated-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(305px,1fr));gap:14px;padding:16px}.deactivated-card{border:1px solid #ead8d2;border-radius:14px;padding:15px;background:linear-gradient(180deg,#fffaf8,#fff)}.deactivated-code{font-size:16px;font-weight:850;color:#8c3d22}.deactivated-name{margin-top:3px;color:#536176;font-size:12px;min-height:32px}.deactivated-badge{display:inline-flex;margin-top:11px;padding:4px 7px;border-radius:999px;background:#fff0ea;color:#9f3e1b;font-size:10px;font-weight:850;letter-spacing:.05em;text-transform:uppercase}.deactivated-dates{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px}.deactivated-date{padding:8px;border:1px solid #f0e2dd;border-radius:9px;background:#fff}.deactivated-date span{display:block;font-size:9px;color:#9a756b;font-weight:850;letter-spacing:.07em}.deactivated-date strong{display:block;margin-top:2px;font-size:12px;color:#5b3427}.deactivated-detail{margin-top:11px;color:#74645e;font-size:11px}.deactivated-link{display:inline-block;margin-top:10px;color:#315dcc;font-size:11px;font-weight:750;text-decoration:none}.deactivated-link:hover{text-decoration:underline}.deactivated-empty{padding:54px 18px;text-align:center;color:var(--muted)}.timetable-title-row{display:flex;gap:14px;justify-content:space-between;align-items:flex-start}.grade-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}.print-action,.docx-action{appearance:none;border-radius:10px;padding:8px 11px;font:800 12px/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;cursor:pointer;white-space:nowrap}.print-action{border:1px solid #b9c9ee;background:#edf2ff;color:#214aab}.print-action:hover{background:#dfe9ff}.docx-action{border:1px solid #132c63;background:#132c63;color:#fff;box-shadow:0 3px 8px rgba(19,44,99,.15)}.docx-action:hover{background:#1d438f}.print-document{display:none}.docx-dialog{width:min(520px,calc(100% - 28px));border:0;border-radius:18px;padding:0;background:transparent;color:var(--ink);box-shadow:0 24px 70px rgba(19,44,99,.28)}.docx-dialog::backdrop{background:rgba(10,24,52,.46);backdrop-filter:blur(2px)}.docx-dialog-card{padding:22px;background:#fff;border:1px solid #dbe4f4;border-radius:18px}.docx-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding-bottom:16px;border-bottom:1px solid #e7edf6}.docx-dialog-eyebrow{font-size:10px;font-weight:850;letter-spacing:.11em;color:#536fae}.docx-dialog h2{margin:4px 0 4px;font-size:20px;letter-spacing:-.03em}.docx-dialog p{margin:0;color:#6a7891;font-size:12px}.dialog-close{appearance:none;border:0;background:transparent;color:#66748b;font-size:28px;line-height:1;cursor:pointer;padding:0 2px}.docx-field{display:flex;flex-direction:column;gap:6px;margin-top:15px}.docx-field span{font-size:10px;font-weight:850;letter-spacing:.09em;color:#75829a}.docx-field input{height:40px;border:1px solid #ccd8ec;border-radius:10px;background:#fbfcff;color:#17223c;padding:0 11px;font:650 13px system-ui,-apple-system,"Segoe UI",Arial,sans-serif}.docx-field input:focus{outline:3px solid rgba(61,103,213,.17);border-color:#6282dd}.docx-dialog-note{margin-top:14px;padding:10px 11px;border:1px solid #dae5f8;border-radius:10px;background:#f5f8ff;color:#5b6f91;font-size:11px;line-height:1.35}.docx-dialog-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}.dialog-cancel,.docx-submit{appearance:none;border-radius:10px;padding:9px 13px;font:800 12px/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;cursor:pointer}.dialog-cancel{border:1px solid #d8e1ef;background:#fff;color:#58687f}.docx-submit{border:1px solid #132c63;background:#132c63;color:#fff}.docx-submit:disabled{opacity:.65;cursor:wait}
     @media(max-width:600px){.timetable-title-row{flex-direction:column}.grade-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.print-action,.docx-action{width:100%;min-height:38px}}
     @media print{
-      @page{size:A4 landscape;margin:7mm}
-      html,body{width:auto!important;min-width:0!important;height:auto!important;margin:0!important;padding:0!important;background:#fff!important;color:#080d14!important;font-family:Arial,Helvetica,sans-serif!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+      @page{size:A4 landscape;margin:8mm}
+      html,body{width:auto!important;min-width:0!important;height:auto!important;margin:0!important;padding:0!important;background:#fff!important;color:#14213a!important;font-family:Arial,Helvetica,sans-serif!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
       body>main{display:none!important}
       body>#printDocument{display:block!important;position:static!important;width:100%!important;margin:0!important;padding:0!important;background:#fff!important}
       .print-page{width:100%;break-after:page;page-break-after:always}
       .print-page:last-child{break-after:auto;page-break-after:auto}
-      .print-page-title{text-align:center!important;margin:0 0 2.4mm!important}
-      .print-page-title h1{margin:0!important;font-size:14.5pt!important;font-weight:800!important;letter-spacing:-.035em!important;line-height:1.05!important;color:#111!important}
-      .print-page-title p{margin:1.1mm 0 0!important;font-size:7.1pt!important;color:#475569!important}
-      .print-grade-shell{display:grid!important;grid-template-columns:minmax(0,1fr) 76mm!important;border:.45mm solid #101820!important;min-height:176mm!important}
-      .print-grade-main{min-width:0!important;border-right:.45mm solid #101820!important}
-      .print-grade-days{display:grid!important;grid-template-columns:13.5mm repeat(var(--print-days),minmax(0,1fr))!important;height:7mm!important;border-bottom:.35mm solid #101820!important;background:#f6f8fb!important}
-      .print-grade-days .print-time-head{display:flex!important;align-items:center!important;justify-content:center!important;border-right:.3mm solid #101820!important;color:#172033!important;font-size:6.4pt!important;font-weight:800!important;letter-spacing:.04em!important}
-      .print-grade-days .print-day-head{display:flex!important;align-items:center!important;justify-content:center!important;border-right:.3mm solid #101820!important;color:#111!important;font-size:6.6pt!important;font-weight:800!important;letter-spacing:.02em!important;text-transform:uppercase!important}
-      .print-grade-days .print-day-head:last-child{border-right:0!important}
-      .print-grade-body{display:grid!important;grid-template-columns:13.5mm minmax(0,1fr)!important;min-height:169mm!important}
-      .print-time-rail{position:relative!important;border-right:.3mm solid #101820!important;background:#fafbfd!important}
-      .print-time-label{position:absolute!important;right:1.2mm!important;transform:translateY(-50%)!important;font-size:6.2pt!important;color:#475569!important;white-space:nowrap!important}
-      .print-time-label.major{font-weight:800!important;color:#932e24!important}
-      .print-week-grid{display:grid!important;grid-template-columns:repeat(var(--print-days),minmax(0,1fr))!important;min-width:0!important}
-      .print-day-canvas{position:relative!important;overflow:hidden!important;background:#e6f0fb!important;border-right:.3mm solid #101820!important}
-      .print-day-canvas:last-child{border-right:0!important}
-      .print-grid-line{position:absolute!important;left:0!important;right:0!important;border-top:.16mm solid rgba(24,47,85,.26)!important}
-      .print-grid-line.major{border-top:.3mm solid rgba(18,34,62,.58)!important}
-      .print-event{position:absolute!important;overflow:hidden!important;padding:1.1mm 1.15mm!important;border:.26mm solid #15233b!important;border-left:.65mm solid #0a5ea8!important;border-radius:1.1mm!important;background:#fff!important;box-shadow:0 .45mm .8mm rgba(20,38,77,.10)!important;line-height:1.06!important}
-      .print-event-code{display:block!important;color:#15233b!important;font-size:6.7pt!important;font-weight:850!important;letter-spacing:.01em!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
-      .print-event-class{display:block!important;margin-top:.55mm!important;color:#344763!important;font-size:5.6pt!important;font-weight:700!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
-      .print-event.multiple .print-event-class{font-size:5.2pt!important}
-      .print-faculty{padding:3mm 3.2mm 2.6mm!important;background:#fff!important;overflow:hidden!important}
-      .print-faculty-title{margin:0 0 2mm!important;padding:0 0 1.3mm!important;border-bottom:.35mm solid #101820!important;text-align:center!important;font-size:7.2pt!important;font-weight:850!important;letter-spacing:.07em!important;color:#111!important}
-      .print-faculty-group{margin:0 0 1.75mm!important;break-inside:avoid!important}
-      .print-faculty-group h2{margin:0 0 .55mm!important;color:#a33227!important;font-size:6.5pt!important;font-weight:850!important;line-height:1.04!important}
-      .print-faculty-course{margin:0 0 .62mm!important;font-size:5.7pt!important;line-height:1.12!important;color:#111!important}
-      .print-faculty-course b{font-weight:850!important}.print-faculty-course span{color:#3c4d66!important}
-      .print-faculty-note{margin:1.8mm 0 0!important;padding-top:1.4mm!important;border-top:.18mm solid #cbd5e1!important;font-size:5.2pt!important;line-height:1.2!important;color:#687991!important}
+      .print-head{display:flex!important;justify-content:space-between!important;align-items:flex-end!important;gap:10mm!important;border-bottom:.35mm solid #172f68!important;padding:0 0 3mm!important;margin:0 0 3mm!important}
+      .print-head h1{margin:0!important;color:#132c63!important;font-size:14pt!important;line-height:1.05!important;letter-spacing:-.01em!important}
+      .print-head p{margin:1mm 0 0!important;color:#46566f!important;font-size:7.5pt!important}
+      .print-stamp{font-size:7pt!important;color:#52647d!important;text-align:right!important;white-space:nowrap!important}
+      .print-grade-table{width:100%!important;border-collapse:collapse!important;table-layout:fixed!important;font-size:7.5pt!important}
+      .print-grade-table th,.print-grade-table td{border:.22mm solid #b7c4d8!important;padding:1.2mm 1.5mm!important;vertical-align:top!important}
+      .print-grade-table thead th{background:#edf2fb!important;color:#142d61!important;font-size:7.3pt!important;font-weight:800!important;letter-spacing:.06em!important;text-align:left!important}
+      .print-grade-table .print-time{width:21mm!important;background:#f7f9fd!important;color:#31435f!important;font-weight:800!important;text-align:right!important;white-space:nowrap!important}
+      .print-grade-table tbody tr{height:10mm!important}
+      .print-slot-line{margin:0 0 .6mm!important;padding:0!important;line-height:1.12!important;break-inside:avoid!important}
+      .print-slot-line:last-child{margin-bottom:0!important}
+      .print-slot-line strong{color:#142d61!important;font-size:7.6pt!important}
+      .print-slot-line span{color:#4b5d79!important;font-size:6.8pt!important}
+      .print-empty{color:#9aa7b8!important}
       .print-list-page{break-before:page;page-break-before:always}
-      .print-list-head{display:flex!important;align-items:flex-end!important;justify-content:space-between!important;gap:8mm!important;border-bottom:.45mm solid #101820!important;padding:0 0 2.1mm!important;margin:0 0 2.8mm!important}
-      .print-list-head h1{margin:0!important;font-size:13.2pt!important;letter-spacing:-.025em!important;color:#111!important}.print-list-head p{margin:1mm 0 0!important;font-size:7pt!important;color:#52647d!important}.print-stamp{font-size:6.7pt!important;color:#52647d!important;text-align:right!important;white-space:nowrap!important}
-      .print-course-columns{columns:2!important;column-gap:6mm!important;column-fill:auto!important}
-      .print-course{break-inside:avoid!important;page-break-inside:avoid!important;border:.2mm solid #ccd7e6!important;border-left:.7mm solid #1c63ae!important;border-radius:1mm!important;background:#fbfdff!important;padding:1.8mm 2mm!important;margin:0 0 1.7mm!important}
-      .print-course h2{margin:0 0 1mm!important;color:#102c62!important;font-size:7.7pt!important;line-height:1.15!important}.print-course h2 span{font-weight:550!important;color:#4c5d75!important}
-      .print-class-list{list-style:none!important;margin:0!important;padding:0!important}.print-class-list li{margin:0 0 .85mm!important;padding:0!important;font-size:6.5pt!important;line-height:1.22!important;color:#24354f!important}.print-class-list li:last-child{margin-bottom:0!important}.print-class-list b{color:#0f3067!important}.print-prof{color:#53657f!important}
-      .print-note{margin:2mm 0 0!important;font-size:6.2pt!important;color:#687991!important}
-      .print-simple-main{border:.45mm solid #101820!important;border-right:.45mm solid #101820!important}.print-simple-main .print-grade-body{min-height:154mm!important}.print-simple-main .print-grade-main{border-right:0!important}
+      .print-course-columns{columns:2!important;column-gap:7mm!important;column-fill:auto!important}
+      .print-course{break-inside:avoid!important;page-break-inside:avoid!important;border-bottom:.2mm solid #d7dfeb!important;padding:0 0 1.8mm!important;margin:0 0 1.8mm!important}
+      .print-course h2{margin:0 0 .8mm!important;color:#142d61!important;font-size:8.4pt!important;line-height:1.14!important}
+      .print-course h2 span{font-weight:500!important;color:#52647d!important}
+      .print-class-list{list-style:none!important;margin:0!important;padding:0!important}
+      .print-class-list li{margin:0 0 1mm!important;padding:0!important;font-size:7pt!important;line-height:1.22!important;color:#293953!important}
+      .print-class-list li:last-child{margin-bottom:0!important}
+      .print-class-list b{color:#142d61!important}
+      .print-prof{color:#50617a!important}
+      .print-note{margin-top:2mm!important;font-size:6.7pt!important;color:#687991!important}
     }
   </style>
 </head>
@@ -220,9 +207,13 @@
       const periodo=Number(item?.periodo||99);
       return {chave:`curricular:${periodo}:${titulo}`,titulo,ordem:Number.isFinite(periodo)?periodo:99,tipo:'curricular'};
     }
-    const categorias=categoriasDaDisciplina(disciplina);
-    if([...categorias].some(c=>/optativa/.test(c)))return {chave:'optativas',titulo:'Optativas',ordem:900,tipo:'especial'};
-    return {chave:'sem-classificacao',titulo:'Sem classificação curricular no Júpiter',ordem:999,tipo:'especial'};
+    // “Optativa Livre” e “Optativa Eletiva” na página de turma são categorias
+    // de vagas, não a classificação curricular da disciplina. Só exibimos
+    // “Optativas” quando a própria grade curricular do Júpiter confirmou isso.
+    if(String(item?.tipoCurricular||'').toLowerCase()==='optativa'){
+      return {chave:'optativas',titulo:'Optativas',ordem:900,tipo:'especial'};
+    }
+    return {chave:'sem-classificacao',titulo:'Classificação curricular pendente no Júpiter',ordem:999,tipo:'especial'};
   }
   function gruposDocentesDinamicos(){
     const mapa=new Map();
@@ -301,6 +292,25 @@
     const tituloInterno=opcoes.incluirTitulo?`<div class="print-title"><h1>Grade Horária Graduação · PNV</h1><p>Disciplinas ofertadas no Júpiter · horários vigentes</p></div>`:'';
     return `<div class="print-grade-main print-simple-main">${tituloInterno}${cabecalho}<div class="print-grade-body" style="height:${alturaMm}mm"><div class="print-time-rail">${trilhoConteudo}</div><div class="print-week-grid" style="--print-days:${dias.length}">${colunas}</div></div></div>`;
   }
+  function montarTabelaImpressaoGrade(){
+    const slots=construirGradeSimplificada();
+    if(!slots.length)return '<p class="print-note">Nenhuma turma com horário reconhecido está disponível.</p>';
+    const dias=GRADE_DAYS.filter(dia=>slots.some(slot=>slot.dia===dia.key));
+    const porSlot=new Map(slots.map(slot=>[`${slot.dia}|${slot.inicio}|${slot.fim}`,slot]));
+    const linhas=[...new Map(slots.map(slot=>[`${slot.inicio}|${slot.fim}`,{inicio:slot.inicio,fim:slot.fim}])).values()]
+      .sort((a,b)=>a.inicio-b.inicio||a.fim-b.fim);
+    const cabecalho=`<thead><tr><th class="print-time">HORÁRIO</th>${dias.map(dia=>`<th>${escapeHtml(dia.short)}</th>`).join('')}</tr></thead>`;
+    const corpo=linhas.map(linha=>{
+      const celulas=dias.map(dia=>{
+        const slot=porSlot.get(`${dia.key}|${linha.inicio}|${linha.fim}`);
+        if(!slot)return '<td class="print-empty">—</td>';
+        return `<td>${slot.cursos.map(curso=>`<div class="print-slot-line"><strong>${escapeHtml(curso.codigo)}</strong><span> · ${curso.turmas.map(turma=>`T${escapeHtml(turma)}`).join(', ')}</span></div>`).join('')}</td>`;
+      }).join('');
+      return `<tr><th class="print-time">${textoHora(linha.inicio)}–${textoHora(linha.fim)}</th>${celulas}</tr>`;
+    }).join('');
+    return `<table class="print-grade-table">${cabecalho}<tbody>${corpo}</tbody></table>`;
+  }
+
   function montarListaImpressaoDisciplinas(){
     const lista=[...disciplinas].sort((a,b)=>a.codigo.localeCompare(b.codigo));
     if(!lista.length)return '<p class="print-note">Nenhuma disciplina ofertada foi registrada.</p>';
@@ -319,7 +329,7 @@
   function prepararDocumentoImpressao(){
     const root=document.getElementById('printDocument');
     const ultima=meta.ultimaAtualizacao?formatTime(meta.ultimaAtualizacao):'—';
-    root.innerHTML=`<section class="print-page print-grade-page"><header class="print-page-title"><h1>Grade Horária Graduação · PNV</h1><p>Disciplinas ofertadas no Júpiter · horários vigentes</p></header><div class="print-grade-shell">${montarGradeImpressaoVisual()}${montarPainelDocentesImpressao()}</div><p class="print-note">Gerado em ${escapeHtml(dataImpressao())} · Última atualização dos dados: ${escapeHtml(ultima)} · Cada bloco representa uma disciplina e sua turma; choques de horário aparecem lado a lado.</p></section><section class="print-page print-list-page"><header class="print-list-head"><div><h1>Disciplinas PNV ofertadas</h1><p>Relação de turmas, horários e docentes informados pelo Júpiter.</p></div><div class="print-stamp">Gerado em ${escapeHtml(dataImpressao())}<br>Última atualização: ${escapeHtml(ultima)}</div></header>${montarListaImpressaoDisciplinas()}</section>`;
+    root.innerHTML=`<section class="print-page print-grade-page"><header class="print-head"><div><h1>Grade Horária PNV</h1><p>Disciplinas atualmente ofertadas no Júpiter.</p></div><div class="print-stamp">Gerado em ${escapeHtml(dataImpressao())}<br>Última atualização: ${escapeHtml(ultima)}</div></header>${montarTabelaImpressaoGrade()}<p class="print-note">Códigos e turmas por dia e intervalo. Disciplinas que coincidem no mesmo horário são listadas juntas na célula correspondente.</p></section><section class="print-page print-list-page"><header class="print-head"><div><h1>Disciplinas PNV ofertadas</h1><p>Turmas, horários e docentes informados pelo Júpiter.</p></div><div class="print-stamp">Gerado em ${escapeHtml(dataImpressao())}<br>Última atualização: ${escapeHtml(ultima)}</div></header>${montarListaImpressaoDisciplinas()}</section>`;
   }
   function imprimirGrade(){prepararDocumentoImpressao();requestAnimationFrame(()=>window.print())}
 
