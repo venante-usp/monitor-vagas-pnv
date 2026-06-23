@@ -1,5 +1,5 @@
 /**
- * Monitor de vagas PNV — Cloudflare Workers Free (V18: docentes por links e separação confiável)
+ * Monitor de vagas PNV — Cloudflare Workers Free (V22: catálogo e disciplinas desativadas)
  *
  * - Interface estática servida pelo próprio Worker.
  * - Dados ficam no Workers KV.
@@ -12,6 +12,13 @@
 
 const URL_LISTA_PNV = 'https://uspdigital.usp.br/jupiterweb/jupDisciplinaLista?codcg=3&pfxdisval=PNV&tipo=D';
 const URL_TURMA = 'https://uspdigital.usp.br/jupiterweb/obterTurma?sgldis=';
+
+// Preencha somente quando a CoC confirmar formalmente que uma disciplina foi
+// substituída por outra. O Júpiter informa a desativação, mas não informa
+// com confiabilidade qual é a sucessora, então o monitor não tenta adivinhar.
+const SUBSTITUICOES_MANUAIS = Object.freeze({
+  // Exemplo: PNV0000: { codigo: 'PNV0001', nome: 'Nome da disciplina sucessora' }
+});
 
 const KEY_DADOS = 'monitor:latest';
 const KEY_ESTADO = 'monitor:state';
@@ -118,17 +125,24 @@ async function executarCiclo(env, instante) {
 }
 
 async function iniciarScanCompleto(env, dados, estado, hojeBrt, agora, { processarPrimeiroLote = true } = {}) {
-  const lista = await buscarListaAtual();
-  if (!lista.ok) throw new Error(`Não foi possível ler a lista PNV: ${lista.erro}`);
+  const catalogo = await buscarCatalogoAtual();
+  if (!catalogo.ok) throw new Error(`Não foi possível ler a lista PNV: ${catalogo.erro}`);
 
-  await prepararScanCompleto(env, dados, estado, lista.codigos, hojeBrt, agora);
+  // A lista oficial do Júpiter já traz Ativação e Desativação. Uma data de
+  // desativação passada significa encerramento administrativo definitivo;
+  // isso é diferente de simplesmente não haver turma neste semestre.
+  sincronizarCompartimentoDesativadas(dados, catalogo.disciplinas, hojeBrt, agora);
+  const disciplinasAtivas = catalogo.disciplinas.filter((disciplina) => !disciplinaEstaDesativada(disciplina, hojeBrt));
+
+  await prepararScanCompleto(env, dados, estado, disciplinasAtivas, hojeBrt, agora);
 
   if (processarPrimeiroLote) {
     await processarLoteCompleto(env, dados, estado, agora);
   }
 }
 
-async function prepararScanCompleto(env, dados, estado, codigos, hojeBrt, agora) {
+async function prepararScanCompleto(env, dados, estado, catalogoAtivo, hojeBrt, agora) {
+  const codigos = catalogoAtivo.map((disciplina) => disciplina.codigo);
   const conjuntoAtual = new Set(codigos);
   estado.inicializacaoSolicitadaEm = null;
 
@@ -297,12 +311,125 @@ async function executarAtualizacaoCurta(env, dados, estado, agora) {
   await Promise.all([salvarDados(env, dados), salvarEstado(env, estado)]);
 }
 
-async function buscarListaAtual() {
+async function buscarCatalogoAtual() {
   const resposta = await buscarTexto(URL_LISTA_PNV);
   if (!resposta.ok) return { ok: false, erro: resposta.erro };
 
-  const codigos = [...new Set(Array.from(textoDaPagina(resposta.html).matchAll(/\bPNV\s*(\d{4})\b/gi), (item) => `PNV${item[1]}`))];
-  return codigos.length ? { ok: true, codigos } : { ok: false, erro: 'A lista não continha códigos PNV reconhecíveis.' };
+  const disciplinas = extrairCatalogoPNVDaLista(resposta.html);
+  return disciplinas.length
+    ? { ok: true, disciplinas }
+    : { ok: false, erro: 'A lista não continha códigos PNV reconhecíveis.' };
+}
+
+/**
+ * Lê a tabela pública “Sigla | Nome | Ativação | Desativação” do Júpiter.
+ * A data vazia é mantida como null. Caso haja uma data de desativação já
+ * alcançada, a disciplina sai do monitor de oferta e entra no compartimento
+ * de desativadas — sem confundir esse caso com “sem turma neste semestre”.
+ */
+function extrairCatalogoPNVDaLista(html) {
+  const resultado = new Map();
+  const linhas = extrairLinhasDeTabelaHtml(html);
+
+  for (const celulas of linhas) {
+    const campos = (celulas || []).map(normalizarTexto).filter(Boolean);
+    const textoLinha = normalizarTexto(campos.join(' '));
+    const codigoEncontrado = textoLinha.match(/\b(PNV\s*\d{4})\b/i);
+    if (!codigoEncontrado) continue;
+
+    const codigo = codigoEncontrado[1].replace(/\s+/g, '').toUpperCase();
+    const datas = Array.from(textoLinha.matchAll(/\b(\d{2}\/\d{2}\/\d{4})\b/g), (item) => normalizarDataJupiter(item[1]));
+    const indiceCodigo = campos.findIndex((campo) => new RegExp(`\\b${codigo}\\b`, 'i').test(campo));
+    let nome = indiceCodigo >= 0 ? normalizarTexto(campos[indiceCodigo + 1] || '') : '';
+
+    // Algumas versões da página deixam código e nome na mesma célula. Neste
+    // caso removemos código e datas antes de aceitar o nome.
+    if (!nome || /^\d{2}\/\d{2}\/\d{4}$/.test(nome)) {
+      nome = normalizarTexto(textoLinha
+        .replace(new RegExp(`\\b${codigo}\\b`, 'ig'), ' ')
+        .replace(/\b\d{2}\/\d{2}\/\d{4}\b/g, ' ')
+        .replace(/\b(?:Sigla|Nome|Ativa(?:ç|c)[aã]o|Desativa(?:ç|c)[aã]o)\b/gi, ' '));
+    }
+
+    if (!nome || /^PNV\d{4}$/i.test(nome)) nome = codigo;
+    resultado.set(codigo, {
+      codigo,
+      nome,
+      ativacao: datas[0] || null,
+      desativacao: datas[1] || null
+    });
+  }
+
+  // Fallback para alterações no HTML da listagem: continua monitorando os
+  // códigos conhecidos, mas sem inventar datas de ativação/desativação.
+  if (!resultado.size) {
+    for (const item of textoDaPagina(html).matchAll(/\bPNV\s*(\d{4})\b/gi)) {
+      const codigo = `PNV${item[1]}`;
+      resultado.set(codigo, { codigo, nome: codigo, ativacao: null, desativacao: null });
+    }
+  }
+
+  return [...resultado.values()].sort((a, b) => a.codigo.localeCompare(b.codigo));
+}
+
+function normalizarDataJupiter(valor) {
+  const match = String(valor || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : null;
+}
+
+function disciplinaEstaDesativada(disciplina, hojeBrt) {
+  return Boolean(disciplina?.desativacao && disciplina.desativacao <= hojeBrt);
+}
+
+function sincronizarCompartimentoDesativadas(dados, catalogo, hojeBrt, agora) {
+  dados.desativadas ||= [];
+  const porCodigo = new Map(dados.desativadas.map((disciplina) => [disciplina.codigo, disciplina]));
+  const ativasNoCatalogo = new Set();
+
+  for (const item of catalogo || []) {
+    if (!disciplinaEstaDesativada(item, hojeBrt)) {
+      ativasNoCatalogo.add(item.codigo);
+      // Caso excepcional de reativação no Júpiter, devolve a disciplina ao
+      // catálogo normal e remove a marca administrativa antiga.
+      porCodigo.delete(item.codigo);
+      continue;
+    }
+
+    const ofertaAtual = (dados.disciplinas || []).find((disciplina) => disciplina.codigo === item.codigo);
+    const anterior = porCodigo.get(item.codigo) || {};
+    const pessoas = ofertaAtual ? resumirPessoas(ofertaAtual) : (anterior.ultimaOferta?.pessoas || null);
+    const substituidaPor = SUBSTITUICOES_MANUAIS[item.codigo] || anterior.substituidaPor || null;
+
+    porCodigo.set(item.codigo, {
+      codigo: item.codigo,
+      nome: item.nome || anterior.nome || item.codigo,
+      ativacao: item.ativacao || anterior.ativacao || null,
+      desativacao: item.desativacao,
+      detectadaEm: anterior.detectadaEm || agora,
+      atualizadaEm: agora,
+      ultimaOfertaEm: ofertaAtual?.atualizadaEm || anterior.ultimaOfertaEm || null,
+      ultimaOferta: ofertaAtual
+        ? {
+            pessoas,
+            inscritos: pessoas.inscritos,
+            pendentes: pessoas.pendentes,
+            matriculados: pessoas.matriculados
+          }
+        : (anterior.ultimaOferta || null),
+      substituidaPor
+    });
+
+    // Não é apenas “sem turma”: como existe desativação administrativa, a
+    // disciplina não deve voltar ao monitor de vagas ou à grade horária.
+    removerDisciplina(dados.disciplinas || [], item.codigo);
+  }
+
+  // Uma entrada só sai do compartimento se o próprio catálogo a trouxer de
+  // volta sem data de desativação. Se ela simplesmente desaparecer da página,
+  // preservamos o registro histórico já detectado.
+  dados.desativadas = [...porCodigo.values()]
+    .filter((disciplina) => !ativasNoCatalogo.has(disciplina.codigo))
+    .sort((a, b) => String(b.desativacao || '').localeCompare(String(a.desativacao || '')) || a.codigo.localeCompare(b.codigo));
 }
 
 async function consultarLote(codigos) {
@@ -1438,12 +1565,14 @@ function montarResposta(dados, estado) {
   const agora = Date.now();
   return {
     disciplinas,
+    desativadas: [...(dados.desativadas || [])].sort((a, b) => String(b.desativacao || '').localeCompare(String(a.desativacao || '')) || a.codigo.localeCompare(b.codigo)),
     meta: {
       geradoEm: agora,
       ultimaAtualizacao: dados.ultimaAtualizacao || null,
       ultimaAtualizacaoCurta: dados.ultimaAtualizacaoCurta || null,
       ultimaConsultaCompleta: dados.ultimaConsultaCompleta || null,
       ultimaListaPNV: dados.ultimaListaPNV || null,
+      disciplinasDesativadas: (dados.desativadas || []).length,
       ultimoErro: dados.ultimoErro || null,
       proximaAtualizacaoCurta: proximoMultiploDeCincoMinutos(agora),
       proximaConsultaCompleta: proximaMeiaNoiteBrt(agora),
@@ -1473,7 +1602,12 @@ function salvarHistorico(env, historico) {
 }
 
 async function lerDados(env) {
-  return (await lerJson(env, KEY_DADOS)) || { disciplinas: [], ultimaAtualizacao: null, ultimoErro: null };
+  return (await lerJson(env, KEY_DADOS)) || {
+    disciplinas: [],
+    desativadas: [],
+    ultimaAtualizacao: null,
+    ultimoErro: null
+  };
 }
 
 async function lerEstado(env) {
