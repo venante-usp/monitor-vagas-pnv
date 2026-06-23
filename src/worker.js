@@ -1,5 +1,5 @@
 /**
- * Monitor de vagas PNV — Cloudflare Workers Free (V22: catálogo e disciplinas desativadas)
+ * Monitor de vagas PNV — Cloudflare Workers Free (V27: classificação curricular resiliente)
  *
  * - Interface estática servida pelo próprio Worker.
  * - Dados ficam no Workers KV.
@@ -336,31 +336,53 @@ async function buscarCatalogoAtual() {
 
 async function atualizarClassificacaoCurricular(dados, catalogoAtivo, agora) {
   const codigos = (catalogoAtivo || []).map((item) => item.codigo).filter((codigo) => /^PNV\d{4}$/i.test(codigo));
+  const anteriores = dados.curriculo?.porCodigo || {};
 
   try {
     const resultado = await buscarClassificacaoCurricular(codigos, agora);
     if (resultado.ok) {
-      dados.curriculo = resultado.curriculo;
+      // A consulta curricular acontece antes do scan de turmas e pode sofrer
+      // indisponibilidade parcial. Nunca apagamos um semestre já confirmado
+      // só porque uma grade histórica falhou nesta execução.
+      const porCodigo = {};
+      for (const codigo of codigos) {
+        if (resultado.curriculo?.porCodigo?.[codigo]) {
+          porCodigo[codigo] = resultado.curriculo.porCodigo[codigo];
+        } else if (anteriores[codigo]) {
+          porCodigo[codigo] = anteriores[codigo];
+        }
+      }
+
+      dados.curriculo = {
+        ...resultado.curriculo,
+        porCodigo,
+        versao: 2,
+        pendentes: codigos.filter((codigo) => !porCodigo[codigo]),
+        ultimoErro: resultado.curriculo?.ultimoErro || null
+      };
       return;
     }
 
     // Não apaga uma classificação útil por uma indisponibilidade momentânea.
     if (!dados.curriculo) {
       dados.curriculo = {
-        versao: 1,
+        versao: 2,
         atualizadoEm: null,
         porCodigo: {},
+        pendentes: [...codigos],
         fontes: [],
         ultimoErro: resultado.erro || 'Não foi possível consultar as habilitações curriculares.'
       };
     } else {
       dados.curriculo.ultimoErro = resultado.erro || 'Não foi possível atualizar as habilitações curriculares.';
       dados.curriculo.tentativaEm = agora;
+      dados.curriculo.pendentes = codigos.filter((codigo) => !dados.curriculo.porCodigo?.[codigo]);
     }
   } catch (erro) {
-    if (!dados.curriculo) dados.curriculo = { versao: 1, atualizadoEm: null, porCodigo: {}, fontes: [] };
+    if (!dados.curriculo) dados.curriculo = { versao: 2, atualizadoEm: null, porCodigo: {}, pendentes: [...codigos], fontes: [] };
     dados.curriculo.ultimoErro = mensagemErro(erro);
     dados.curriculo.tentativaEm = agora;
+    dados.curriculo.pendentes = codigos.filter((codigo) => !dados.curriculo.porCodigo?.[codigo]);
     console.error('Falha na classificação curricular:', erro?.stack || erro);
   }
 }
@@ -537,17 +559,31 @@ async function buscarGradeCurricular(habilitacao, origem) {
 function extrairDisciplinasDaGradeCurricular(html, habilitacao, origem) {
   const resultado = new Map();
   let periodoAtual = null;
+  let contextoAtual = null;
+
+  const contextoDaLinha = (texto) => {
+    const limpo = normalizarTexto(texto);
+    // Só considera cabeçalho de optativas quando a linha não contém código de
+    // disciplina. Isso evita confundir uma vaga “Optativa Livre” com categoria
+    // curricular da disciplina obrigatória.
+    if (!/\bPNV\s*\d{4}\b/i.test(limpo) && /\bdisciplinas?\s+optativas?\b|\boptativas?\b/i.test(limpo)) return 'optativa';
+    if (!/\bPNV\s*\d{4}\b/i.test(limpo) && /\bdisciplinas?\s+obrigat[oó]rias?\b/i.test(limpo)) return 'obrigatoria';
+    return null;
+  };
 
   const registrar = (texto, periodoDaLinha = null) => {
     const periodo = periodoDaLinha || periodoAtual;
-    if (!Number.isInteger(periodo) || periodo < 1 || periodo > 20) return;
+    const temPeriodo = Number.isInteger(periodo) && periodo >= 1 && periodo <= 20;
     for (const achado of String(texto || '').matchAll(/\b(PNV\s*\d{4})\b/gi)) {
       const codigo = achado[1].replace(/\s+/g, '').toUpperCase();
-      if (!resultado.has(codigo)) {
+      // A primeira ocorrência no currículo mais atual tem precedência; nunca
+      // substituímos um semestre ideal por uma seção genérica de optativas.
+      if (!resultado.has(codigo) || (temPeriodo && !Number.isInteger(resultado.get(codigo)?.periodo))) {
         resultado.set(codigo, {
           codigo,
-          periodo,
-          rotulo: rotuloCurricular(periodo),
+          periodo: temPeriodo ? periodo : null,
+          rotulo: temPeriodo ? rotuloCurricular(periodo) : '',
+          tipoCurricular: !temPeriodo && contextoAtual === 'optativa' ? 'optativa' : null,
           origem,
           codcur: habilitacao.codcur,
           codhab: habilitacao.codhab,
@@ -563,8 +599,13 @@ function extrairDisciplinasDaGradeCurricular(html, habilitacao, origem) {
   for (const celulas of extrairLinhasDeTabelaHtml(html)) {
     const texto = normalizarTexto((celulas || []).join(' ').replace(/\u241D/g, ' '));
     if (!texto) continue;
+    const contexto = contextoDaLinha(texto);
+    if (contexto) contextoAtual = contexto;
     const periodoDaLinha = extrairPeriodoCurricular(texto, celulas);
-    if (periodoDaLinha) periodoAtual = periodoDaLinha;
+    if (periodoDaLinha) {
+      periodoAtual = periodoDaLinha;
+      contextoAtual = 'obrigatoria';
+    }
     registrar(texto, periodoDaLinha);
   }
 
@@ -573,8 +614,13 @@ function extrairDisciplinasDaGradeCurricular(html, habilitacao, origem) {
   if (!resultado.size) {
     for (const linha of textoEstruturadoDaPagina(html).split(/\n+/)) {
       const texto = normalizarTexto(linha.replace(/\u241F/g, ' '));
+      const contexto = contextoDaLinha(texto);
+      if (contexto) contextoAtual = contexto;
       const periodoDaLinha = extrairPeriodoCurricular(texto);
-      if (periodoDaLinha) periodoAtual = periodoDaLinha;
+      if (periodoDaLinha) {
+        periodoAtual = periodoDaLinha;
+        contextoAtual = 'obrigatoria';
+      }
       registrar(texto, periodoDaLinha);
     }
   }
