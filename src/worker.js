@@ -13,6 +13,13 @@
 const URL_LISTA_PNV = 'https://uspdigital.usp.br/jupiterweb/jupDisciplinaLista?codcg=3&pfxdisval=PNV&tipo=D';
 const URL_TURMA = 'https://uspdigital.usp.br/jupiterweb/obterTurma?sgldis=';
 
+// Estruturas curriculares oficiais da Escola Politécnica. A classificação
+// por semestre não é mantida manualmente no código: ela é lida diretamente
+// das habilitações atual e históricas do Júpiter a cada varredura completa.
+const URL_HABILITACOES_ATUAIS = 'https://uspdigital.usp.br/jupiterweb/jupCursoLista?codcg=3&tipo=N';
+const URL_HABILITACOES_ANTIGAS = 'https://uspdigital.usp.br/jupiterweb/jupCursoLista?codcg=3&tipo=V';
+const URL_BASE_JUPITER = 'https://uspdigital.usp.br/jupiterweb/';
+
 // Preencha somente quando a CoC confirmar formalmente que uma disciplina foi
 // substituída por outra. O Júpiter informa a desativação, mas não informa
 // com confiabilidade qual é a sucessora, então o monitor não tenta adivinhar.
@@ -133,6 +140,12 @@ async function iniciarScanCompleto(env, dados, estado, hojeBrt, agora, { process
   // isso é diferente de simplesmente não haver turma neste semestre.
   sincronizarCompartimentoDesativadas(dados, catalogo.disciplinas, hojeBrt, agora);
   const disciplinasAtivas = catalogo.disciplinas.filter((disciplina) => !disciplinaEstaDesativada(disciplina, hojeBrt));
+
+  // Lê a grade curricular da habilitação atual e, somente para os códigos
+  // que não estiverem nela, procura a estrutura naval histórica mais recente.
+  // Se o Júpiter oscilar, preservamos a última classificação válida em vez de
+  // interromper a varredura de vagas ou inventar um semestre.
+  await atualizarClassificacaoCurricular(dados, disciplinasAtivas, agora);
 
   await prepararScanCompleto(env, dados, estado, disciplinasAtivas, hojeBrt, agora);
 
@@ -319,6 +332,296 @@ async function buscarCatalogoAtual() {
   return disciplinas.length
     ? { ok: true, disciplinas }
     : { ok: false, erro: 'A lista não continha códigos PNV reconhecíveis.' };
+}
+
+async function atualizarClassificacaoCurricular(dados, catalogoAtivo, agora) {
+  const codigos = (catalogoAtivo || []).map((item) => item.codigo).filter((codigo) => /^PNV\d{4}$/i.test(codigo));
+
+  try {
+    const resultado = await buscarClassificacaoCurricular(codigos, agora);
+    if (resultado.ok) {
+      dados.curriculo = resultado.curriculo;
+      return;
+    }
+
+    // Não apaga uma classificação útil por uma indisponibilidade momentânea.
+    if (!dados.curriculo) {
+      dados.curriculo = {
+        versao: 1,
+        atualizadoEm: null,
+        porCodigo: {},
+        fontes: [],
+        ultimoErro: resultado.erro || 'Não foi possível consultar as habilitações curriculares.'
+      };
+    } else {
+      dados.curriculo.ultimoErro = resultado.erro || 'Não foi possível atualizar as habilitações curriculares.';
+      dados.curriculo.tentativaEm = agora;
+    }
+  } catch (erro) {
+    if (!dados.curriculo) dados.curriculo = { versao: 1, atualizadoEm: null, porCodigo: {}, fontes: [] };
+    dados.curriculo.ultimoErro = mensagemErro(erro);
+    dados.curriculo.tentativaEm = agora;
+    console.error('Falha na classificação curricular:', erro?.stack || erro);
+  }
+}
+
+/**
+ * Lê a habilitação naval atual primeiro. Para cada código PNV que não aparece
+ * na estrutura atual, percorre as habilitações históricas da mais recente para
+ * a mais antiga, parando assim que encontra o semestre da disciplina.
+ */
+async function buscarClassificacaoCurricular(codigosAlvo, agora) {
+  const alvo = new Set((codigosAlvo || []).map((codigo) => String(codigo).toUpperCase()));
+  const porCodigo = new Map();
+  const fontesUsadas = [];
+  const erros = [];
+
+  const atual = await buscarHabilitacoesNavais(URL_HABILITACOES_ATUAIS, 'N');
+  if (atual.ok) {
+    for (const habilitacao of ordenarHabilitacoes(atual.habilitacoes)) {
+      const grade = await buscarGradeCurricular(habilitacao, 'atual');
+      if (!grade.ok) {
+        erros.push(`${habilitacao.identificador}: ${grade.erro}`);
+        continue;
+      }
+      fontesUsadas.push(grade.fonte);
+      registrarDisciplinasCurriculares(porCodigo, grade.disciplinas, 0);
+    }
+  } else {
+    erros.push(`habilitação atual: ${atual.erro}`);
+  }
+
+  const pendentes = () => [...alvo].filter((codigo) => !porCodigo.has(codigo));
+
+  // A lista V é usada apenas quando a disciplina não pertence à habilitação
+  // atual. A ordenação pelo código curricular coloca a versão mais recente
+  // antes das anteriores, sem manter uma lista fixa de códigos no aplicativo.
+  if (pendentes().length) {
+    const antigas = await buscarHabilitacoesNavais(URL_HABILITACOES_ANTIGAS, 'V');
+    if (antigas.ok) {
+      for (const habilitacao of ordenarHabilitacoes(antigas.habilitacoes)) {
+        if (!pendentes().length) break;
+        const grade = await buscarGradeCurricular(habilitacao, 'historica');
+        if (!grade.ok) {
+          erros.push(`${habilitacao.identificador}: ${grade.erro}`);
+          continue;
+        }
+        fontesUsadas.push(grade.fonte);
+        registrarDisciplinasCurriculares(porCodigo, grade.disciplinas, 1);
+      }
+    } else {
+      erros.push(`habilitações históricas: ${antigas.erro}`);
+    }
+  }
+
+  const mapeamento = {};
+  for (const [codigo, item] of porCodigo) {
+    if (!alvo.size || alvo.has(codigo)) {
+      const { _prioridade, ...limpo } = item;
+      mapeamento[codigo] = limpo;
+    }
+  }
+
+  const encontrou = Object.keys(mapeamento).length > 0;
+  return {
+    ok: encontrou || !alvo.size,
+    erro: encontrou ? null : (erros.join(' · ') || 'Nenhuma disciplina PNV foi localizada nas grades curriculares.'),
+    curriculo: {
+      versao: 1,
+      atualizadoEm: agora,
+      porCodigo: mapeamento,
+      fontes: deduplicarFontesCurriculares(fontesUsadas),
+      ultimoErro: erros.length ? erros.join(' · ').slice(0, 800) : null
+    }
+  };
+}
+
+async function buscarHabilitacoesNavais(url, tipoEsperado) {
+  const resposta = await buscarTexto(url);
+  if (!resposta.ok) return { ok: false, erro: resposta.erro, habilitacoes: [] };
+
+  const habilitacoes = extrairHabilitacoesNavais(resposta.html, tipoEsperado);
+  return habilitacoes.length
+    ? { ok: true, habilitacoes }
+    : { ok: false, erro: 'A lista não trouxe links de grade para Engenharia Naval.', habilitacoes: [] };
+}
+
+function extrairHabilitacoesNavais(html, tipoEsperado) {
+  const fonte = String(html || '')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ');
+  const resultado = new Map();
+  let ordem = 0;
+
+  const registrarDoTrecho = (trecho, textoContexto) => {
+    if (!/\bEngenharia\s+Naval(?:\s+e\s+Oce[aâ]nica)?\b/i.test(textoContexto || '')) return;
+    if (/\bEngenharia\s+Nuclear\b/i.test(textoContexto || '')) return;
+
+    const regexLink = /<a\b[^>]*\bhref\s*=\s*(?:["']([^"']+)["']|([^\s>]+))[^>]*>([\s\S]*?)<\/a\s*>/gi;
+    for (const achado of String(trecho || '').matchAll(regexLink)) {
+      const href = decodificarEntidadesHtml(achado[1] || achado[2] || '').trim();
+      let absoluto;
+      try { absoluto = new URL(href, URL_BASE_JUPITER); } catch { continue; }
+      if (!/listarGradeCurricular/i.test(absoluto.pathname)) continue;
+
+      const codcur = Number.parseInt(absoluto.searchParams.get('codcur') || '', 10);
+      const codhab = Number.parseInt(absoluto.searchParams.get('codhab') || '0', 10);
+      const tipo = String(absoluto.searchParams.get('tipo') || tipoEsperado || '').toUpperCase();
+      if (!Number.isFinite(codcur)) continue;
+
+      const chave = `${codcur}|${Number.isFinite(codhab) ? codhab : 0}|${tipo}`;
+      if (resultado.has(chave)) continue;
+      resultado.set(chave, {
+        codcur,
+        codhab: Number.isFinite(codhab) ? codhab : 0,
+        tipo,
+        url: absoluto.toString(),
+        ordem: ordem += 1,
+        identificador: `${codcur}-${Number.isFinite(codhab) ? codhab : 0}`,
+        descricao: normalizarTexto(textoContexto).slice(0, 300)
+      });
+    }
+  };
+
+  const regexLinha = /<tr\b[^>]*>[\s\S]*?<\/tr\s*>/gi;
+  let encontrouLinha = false;
+  for (const linha of fonte.matchAll(regexLinha)) {
+    encontrouLinha = true;
+    registrarDoTrecho(linha[0], textoDaPagina(linha[0]));
+  }
+
+  // Algumas versões do Júpiter não usam <tr> na lista. Nelas, procuramos cada
+  // link em uma janela de contexto que ainda contém o nome da habilitação.
+  if (!resultado.size || !encontrouLinha) {
+    const regexLinkAmplo = /<a\b[^>]*\bhref\s*=\s*(?:["']([^"']+)["']|([^\s>]+))[^>]*>[\s\S]*?<\/a\s*>/gi;
+    for (const achado of fonte.matchAll(regexLinkAmplo)) {
+      const inicio = Math.max(0, (achado.index || 0) - 900);
+      const fim = Math.min(fonte.length, (achado.index || 0) + achado[0].length + 900);
+      const trecho = fonte.slice(inicio, fim);
+      registrarDoTrecho(achado[0], textoDaPagina(trecho));
+    }
+  }
+
+  return [...resultado.values()];
+}
+
+function ordenarHabilitacoes(habilitacoes) {
+  return [...(habilitacoes || [])].sort((a, b) => (
+    Number(b.codcur || 0) - Number(a.codcur || 0)
+    || Number(b.codhab || 0) - Number(a.codhab || 0)
+    || Number(a.ordem || 0) - Number(b.ordem || 0)
+  ));
+}
+
+async function buscarGradeCurricular(habilitacao, origem) {
+  const resposta = await buscarTexto(habilitacao.url);
+  if (!resposta.ok) return { ok: false, erro: resposta.erro };
+
+  const disciplinas = extrairDisciplinasDaGradeCurricular(resposta.html, habilitacao, origem);
+  return disciplinas.length
+    ? {
+        ok: true,
+        disciplinas,
+        fonte: {
+          origem,
+          codcur: habilitacao.codcur,
+          codhab: habilitacao.codhab,
+          tipo: habilitacao.tipo,
+          url: habilitacao.url,
+          identificador: habilitacao.identificador
+        }
+      }
+    : { ok: false, erro: 'A grade não trouxe disciplinas PNV com período reconhecido.' };
+}
+
+function extrairDisciplinasDaGradeCurricular(html, habilitacao, origem) {
+  const resultado = new Map();
+  let periodoAtual = null;
+
+  const registrar = (texto, periodoDaLinha = null) => {
+    const periodo = periodoDaLinha || periodoAtual;
+    if (!Number.isInteger(periodo) || periodo < 1 || periodo > 20) return;
+    for (const achado of String(texto || '').matchAll(/\b(PNV\s*\d{4})\b/gi)) {
+      const codigo = achado[1].replace(/\s+/g, '').toUpperCase();
+      if (!resultado.has(codigo)) {
+        resultado.set(codigo, {
+          codigo,
+          periodo,
+          rotulo: rotuloCurricular(periodo),
+          origem,
+          codcur: habilitacao.codcur,
+          codhab: habilitacao.codhab,
+          tipo: habilitacao.tipo,
+          fonte: habilitacao.identificador
+        });
+      }
+    }
+  };
+
+  // A grade normalmente apresenta um cabeçalho “nº semestre/período” seguido
+  // pelas linhas das disciplinas. Mantemos o último cabeçalho visto.
+  for (const celulas of extrairLinhasDeTabelaHtml(html)) {
+    const texto = normalizarTexto((celulas || []).join(' ').replace(/\u241D/g, ' '));
+    if (!texto) continue;
+    const periodoDaLinha = extrairPeriodoCurricular(texto, celulas);
+    if (periodoDaLinha) periodoAtual = periodoDaLinha;
+    registrar(texto, periodoDaLinha);
+  }
+
+  // Fallback para páginas cuja tabela foi simplificada: conserva a ordem das
+  // linhas e reconhece cabeçalhos de semestre fora de <tr>.
+  if (!resultado.size) {
+    for (const linha of textoEstruturadoDaPagina(html).split(/\n+/)) {
+      const texto = normalizarTexto(linha.replace(/\u241F/g, ' '));
+      const periodoDaLinha = extrairPeriodoCurricular(texto);
+      if (periodoDaLinha) periodoAtual = periodoDaLinha;
+      registrar(texto, periodoDaLinha);
+    }
+  }
+
+  return [...resultado.values()];
+}
+
+function extrairPeriodoCurricular(texto, celulas = []) {
+  const fonte = normalizarTexto([texto, ...(celulas || [])].join(' '));
+  const padroes = [
+    /(?:^|\b)(\d{1,2})\s*(?:º|ª|o)?\s*(?:semestre|per[ií]odo)\b/i,
+    /\b(?:semestre|per[ií]odo)\s*(?:ideal)?\s*[:\-]?\s*(\d{1,2})\b/i,
+    /\b(\d{1,2})\s*(?:º|ª)\s*sem\.?\b/i
+  ];
+  for (const padrao of padroes) {
+    const achado = fonte.match(padrao);
+    const periodo = Number.parseInt(achado?.[1] || '', 10);
+    if (Number.isInteger(periodo) && periodo >= 1 && periodo <= 20) return periodo;
+  }
+  return null;
+}
+
+function rotuloCurricular(periodo) {
+  // A grade do Júpiter informa o semestre ideal. O ano é apenas a conversão
+  // aritmética desse próprio semestre (dois semestres por ano), sem uma lista
+  // manual de códigos de disciplinas.
+  const ano = Math.ceil(Number(periodo) / 2);
+  return `${ano}º ano · ${periodo}º semestre`;
+}
+
+function registrarDisciplinasCurriculares(destino, disciplinas, prioridade) {
+  for (const item of disciplinas || []) {
+    const atual = destino.get(item.codigo);
+    if (!atual || Number(prioridade) < Number(atual._prioridade ?? 99)) {
+      destino.set(item.codigo, { ...item, _prioridade: prioridade });
+    }
+  }
+}
+
+function deduplicarFontesCurriculares(fontes) {
+  const vistas = new Set();
+  return (fontes || []).filter((fonte) => {
+    const chave = `${fonte.origem}|${fonte.codcur}|${fonte.codhab}|${fonte.tipo}`;
+    if (vistas.has(chave)) return false;
+    vistas.add(chave);
+    return true;
+  });
 }
 
 /**
@@ -1566,6 +1869,7 @@ function montarResposta(dados, estado) {
   return {
     disciplinas,
     desativadas: [...(dados.desativadas || [])].sort((a, b) => String(b.desativacao || '').localeCompare(String(a.desativacao || '')) || a.codigo.localeCompare(b.codigo)),
+    curriculo: dados.curriculo || { versao: 1, atualizadoEm: null, porCodigo: {}, fontes: [] },
     meta: {
       geradoEm: agora,
       ultimaAtualizacao: dados.ultimaAtualizacao || null,
@@ -1605,6 +1909,7 @@ async function lerDados(env) {
   return (await lerJson(env, KEY_DADOS)) || {
     disciplinas: [],
     desativadas: [],
+    curriculo: { versao: 1, atualizadoEm: null, porCodigo: {}, fontes: [] },
     ultimaAtualizacao: null,
     ultimoErro: null
   };
