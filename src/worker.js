@@ -880,7 +880,7 @@ async function buscarTexto(url) {
 
     // O Júpiter ainda entrega diversas páginas em Windows-1252/ISO-8859-1.
     // Response.text() sempre assume UTF-8 e transforma caracteres como “á” em
-    // “�”. Por isso lemos os bytes e escolhemos a decodificação mais plausível.
+    // “ ”. Por isso lemos os bytes e escolhemos a decodificação mais plausível.
     const html = await decodificarHtmlDoJupiter(resposta);
     return html.length >= 100 ? { ok: true, html } : { ok: false, erro: 'Resposta vazia ou incompleta.' };
   } catch (erro) {
@@ -990,7 +990,7 @@ function paginaConfirmaDisciplina(texto, codigo) {
 }
 
 function paginaIndicaCodigoDeTurma(texto) {
-  return /C(?:[oó]|�)digo\s+da\s+Turma\s*:\s*\d+/i.test(texto);
+  return /C(?:[oó]| )digo\s+da\s+Turma\s*:\s*\d+/i.test(texto);
 }
 
 function paginaConfirmaSemOferta(texto) {
@@ -999,12 +999,12 @@ function paginaConfirmaSemOferta(texto) {
 }
 
 function extrairNome(texto, codigo) {
-  const padrao = new RegExp(`Disciplina\\s*:\\s*(${codigo}\\s*[-–]\\s*.*?)\\s*(?:Clique\\s+para|Lista\\s+de\\s+Turmas|C(?:[oó]|�)digo\\s+da\\s+Turma|$)`, 'i');
+  const padrao = new RegExp(`Disciplina\\s*:\\s*(${codigo}\\s*[-–]\\s*.*?)\\s*(?:Clique\\s+para|Lista\\s+de\\s+Turmas|C(?:[oó]| )digo\\s+da\\s+Turma|$)`, 'i');
   return normalizarTexto(texto.match(padrao)?.[1] || `Disciplina ${codigo}`);
 }
 
 function extrairTurmas(texto, textoEstruturado = '', html = '') {
-  const marcador = /C(?:[oó]|�)digo\s+da\s+Turma\s*:\s*(\d+)/gi;
+  const marcador = /C(?:[oó]| )digo\s+da\s+Turma\s*:\s*(\d+)/gi;
   const ocorrencias = Array.from(texto.matchAll(marcador));
 
   // O Júpiter muda a estrutura da coluna de docentes entre disciplinas.
@@ -1073,7 +1073,7 @@ function extrairTipoTurma(texto) {
 }
 
 function extrairTurmaTeoricaVinculada(texto) {
-  return texto.match(/C(?:[oó]|�)digo\s+da\s+Turma\s+Te(?:[oó]|�)rica\s*:\s*(\d+)/i)?.[1] || null;
+  return texto.match(/C(?:[oó]| )digo\s+da\s+Turma\s+Te(?:[oó]| )rica\s*:\s*(\d+)/i)?.[1] || null;
 }
 
 function extrairHorario(texto) {
@@ -1111,7 +1111,7 @@ function extrairProfessoresPorTurmaComLinks(html) {
     .replace(/\n{2,}/g, '\n')
     .trim();
 
-  const marcador = /C(?:[oó]|�)digo\s+da\s+Turma\s*:\s*(\d+)/gi;
+  const marcador = /C(?:[oó]| )digo\s+da\s+Turma\s*:\s*(\d+)/gi;
   const ocorrencias = Array.from(estrutura.matchAll(marcador));
   const resultado = new Map();
 
@@ -1157,7 +1157,7 @@ function extrairProfessoresPorTurmaDoHtml(html) {
     const textoLinha = normalizarTexto(campos.join(' '));
     if (!textoLinha) continue;
 
-    const encontradoCodigo = textoLinha.match(/C(?:[oó]|�)digo\s+da\s+Turma\s*:\s*(\d+)/i);
+    const encontradoCodigo = textoLinha.match(/C(?:[oó]| )digo\s+da\s+Turma\s*:\s*(\d+)/i);
     if (encontradoCodigo) {
       codigoAtual = encontradoCodigo[1];
       dentroDoQuadroHorario = false;
@@ -1182,7 +1182,7 @@ function extrairProfessoresPorTurmaDoHtml(html) {
     if (!dentroDoQuadroHorario) continue;
 
     // Linhas administrativas que não pertencem à grade de horário.
-    if (/^(?:Observa(?:ç|c)[oõ]es?|In[ií]cio|Fim|Tipo\s+da\s+Turma|C(?:[oó]|�)digo\s+da\s+Turma(?:\s+Te(?:[oó]|�)rica)?|Clique\b)/i.test(textoLinha)) continue;
+    if (/^(?:Observa(?:ç|c)[oõ]es?|In[ií]cio|Fim|Tipo\s+da\s+Turma|C(?:[oó]| )digo\s+da\s+Turma(?:\s+Te(?:[oó]| )rica)?|Clique\b)/i.test(textoLinha)) continue;
 
     const professores = extrairProfessoresDaLinhaDeTabela(campos);
     if (professores.length) adicionarProfessoresAoMapa(resultado, codigoAtual, professores);
@@ -1261,7 +1261,7 @@ function limparPossivelProfessor(valor) {
 function pareceNomeDeProfessor(valor) {
   const nome = normalizarTexto(valor);
   if (!nome || nome.length < 5 || /\d/.test(nome)) return false;
-  if (/^(?:Vagas|Inscritos|Pendentes|Matriculados|Observa(?:ç|c)[oõ]es?|In[ií]cio|Fim|Tipo\s+da\s+Turma|Te[oó]rica|Pr[aá]tica|Vinculada|C(?:[oó]|�)digo\s+da\s+Turma|Clique\b)/i.test(nome)) return false;
+  if (/^(?:Vagas|Inscritos|Pendentes|Matriculados|Observa(?:ç|c)[oõ]es?|In[ií]cio|Fim|Tipo\s+da\s+Turma|Te[oó]rica|Pr[aá]tica|Vinculada|C(?:[oó]| )digo\s+da\s+Turma|Clique\b)/i.test(nome)) return false;
   if (/\b(?:seg|ter|qua|qui|sex|s[aá]b|dom)\b/i.test(nome)) return false;
 
   // Docentes no Júpiter são nomes completos. Exigir dois termos evita que
@@ -1279,7 +1279,7 @@ function extrairProfessoresPorTurma(textoEstruturado) {
   const estrutura = String(textoEstruturado || '');
   if (!estrutura) return new Map();
 
-  const marcador = /C(?:[oó]|�)digo\s+da\s+Turma\s*:\s*(\d+)/gi;
+  const marcador = /C(?:[oó]| )digo\s+da\s+Turma\s*:\s*(\d+)/gi;
   const ocorrencias = Array.from(estrutura.matchAll(marcador));
   const resultado = new Map();
 
@@ -1337,7 +1337,7 @@ function extrairProfessoresDosCampos(campos) {
     if (!campo) continue;
 
     if (/^(?:Hor[aá]rio|Prof\.?\(a\)?\.?)$/i.test(campo)) continue;
-    if (/^(?:Tipo\s+da\s+Turma|Observa(?:ç|c)[oõ]es?|In[ií]cio|Fim|C(?:[oó]|�)digo\s+da\s+Turma(?:\s+Te(?:[oó]|�)rica)?|Vagas|Inscritos|Pendentes|Matriculados)\b/i.test(campo)) break;
+    if (/^(?:Tipo\s+da\s+Turma|Observa(?:ç|c)[oõ]es?|In[ií]cio|Fim|C(?:[oó]| )digo\s+da\s+Turma(?:\s+Te(?:[oó]| )rica)?|Vagas|Inscritos|Pendentes|Matriculados)\b/i.test(campo)) break;
 
     const possuiDia = /\b(?:seg|ter|qua|qui|sex|s[aá]b|dom)\b/i.test(campo);
     const possuiHorario = /\b\d{1,2}:\d{2}\b/.test(campo);
@@ -1408,16 +1408,26 @@ function extrairDias(horario) {
 
 function extrairCategorias(texto) {
   const categorias = [];
-const regex = /\b(Obrigat(?:ória|�ria)|Optativa\s+Eletiva|Optativa\s+Livre|Alunos\s+Especiais|Extracurricular|Qualquer\s+Unidade(?:\s+da\s+USP)?)\s+(\d+|-)\s+(\d+|-)\s+(-|\d+)\s+(\d+|-)/gi;  for (const encontrado of texto.matchAll(regex)) {
+const regex = /\b(Obrigat(?:ória| ria)|Optativa\s+Eletiva|Optativa\s+Livre|Alunos\s+Especiais|Extracurricular|Qualquer\s+Unidade(?:\s+da\s+USP)?)\s+(\d+|-)\s+(\d+|-)\s+(-|\d+)\s+(\d+|-)/gi;  for (const encontrado of texto.matchAll(regex)) {
   const vagas = Number(encontrado[2]);
   if (!Number.isFinite(vagas) || vagas <= 0) continue;
+
+  // O Júpiter informa "Inscritos" como o total geral (pendentes + matriculados
+  // + aguardando). Somar os três como se fossem disjuntos duplicava a ocupação
+  // (ex.: 47 vagas com 47 inscritos e 47 matriculados virava 200% ocupado).
+  // Normaliza para "aguardando vaga" para que ocupadas = inscritos + pendentes
+  // + matriculados volte a representar pessoas distintas.
+  const inscritosBrutos = encontrado[3] === '-' ? 0 : Number(encontrado[3]) || 0;
+  const pendentes = encontrado[4] === '-' ? 0 : Number(encontrado[4]) || 0;
+  const matriculados = encontrado[5] === '-' ? 0 : Number(encontrado[5]) || 0;
+  const inscritos = Math.max(0, inscritosBrutos - pendentes - matriculados);
 
   categorias.push({
    nome: normalizarTexto(encontrado[1]),
    vagas,
-   inscritos: encontrado[3] === '-' ? 0 : Number(encontrado[3]) || 0,
-   pendentes: encontrado[4] === '-' ? 0 : Number(encontrado[4]) || 0,
-   matriculados: encontrado[5] === '-' ? 0 : Number(encontrado[5]) || 0
+   inscritos,
+   pendentes,
+   matriculados
 });
   }
   return categorias;
