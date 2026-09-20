@@ -1408,17 +1408,17 @@ function extrairDias(horario) {
 
 function extrairCategorias(texto) {
   const categorias = [];
-  const regex = /\b(Obrigat(?:ória|�ria)|Optativa\s+Eletiva|Optativa\s+Livre|Alunos\s+Especiais|Extracurricular|Qualquer\s+Unidade(?:\s+da\s+USP)?)\s+(\d+)\s+(\d+)\s+(-|\d+)\s+(\d+)/gi;
-  for (const encontrado of texto.matchAll(regex)) {
-    const vagas = Number(encontrado[2]);
-    if (!Number.isFinite(vagas) || vagas <= 0) continue;
-    categorias.push({
-      nome: normalizarTexto(encontrado[1]),
-      vagas,
-      inscritos: Number(encontrado[3]) || 0,
-      pendentes: encontrado[4] === '-' ? 0 : Number(encontrado[4]) || 0,
-      matriculados: Number(encontrado[5]) || 0
-    });
+const regex = /\b(Obrigat(?:ória|�ria)|Optativa\s+Eletiva|Optativa\s+Livre|Alunos\s+Especiais|Extracurricular|Qualquer\s+Unidade(?:\s+da\s+USP)?)\s+(\d+|-)\s+(\d+|-)\s+(-|\d+)\s+(\d+|-)/gi;  for (const encontrado of texto.matchAll(regex)) {
+  const vagas = Number(encontrado[2]);
+  if (!Number.isFinite(vagas) || vagas <= 0) continue;
+
+  categorias.push({
+   nome: normalizarTexto(encontrado[1]),
+   vagas,
+   inscritos: encontrado[3] === '-' ? 0 : Number(encontrado[3]) || 0,
+   pendentes: encontrado[4] === '-' ? 0 : Number(encontrado[4]) || 0,
+   matriculados: encontrado[5] === '-' ? 0 : Number(encontrado[5]) || 0
+});
   }
   return categorias;
 }
