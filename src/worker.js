@@ -1471,11 +1471,47 @@ function resumirPessoas(disciplina) {
 }
 
 function somarRegistros(turmas) {
-  return turmas.reduce((soma, turma) => ({
-    inscritos: soma.inscritos + Number(turma.inscritos || 0),
-    pendentes: soma.pendentes + Number(turma.pendentes || 0),
-    matriculados: soma.matriculados + Number(turma.matriculados || 0)
-  }), { inscritos: 0, pendentes: 0, matriculados: 0 });
+  return turmas.reduce((soma, turma) => {
+    const norm = normalizarContagemTurma(turma);
+    return {
+      inscritos: soma.inscritos + norm.inscritos,
+      pendentes: soma.pendentes + norm.pendentes,
+      matriculados: soma.matriculados + norm.matriculados
+    };
+  }, { inscritos: 0, pendentes: 0, matriculados: 0 });
+}
+
+/**
+ * O Júpiter informa "Inscritos" como total (pendentes + matriculados +
+ * aguardando). Versões antigas do monitor somavam os três como disjuntos,
+ * duplicando a ocupação (ex.: 42 inscritos + 42 matriculados em 65 vagas
+ * virava 129%). Esta normalização é idempotente: converte dado legado e
+ * preserva dado novo, então pode ser aplicada na leitura sem esperar rescan.
+ */
+function normalizarContagemTurma(turma) {
+  const pendentes = Number(turma?.pendentes || 0) || 0;
+  const matriculados = Number(turma?.matriculados || 0) || 0;
+  const inscritosBrutos = Number(turma?.inscritos || 0) || 0;
+  return {
+    inscritos: Math.max(0, inscritosBrutos - pendentes - matriculados),
+    pendentes,
+    matriculados
+  };
+}
+
+function normalizarTurmaParaResposta(turma) {
+  const norm = normalizarContagemTurma(turma);
+  const total = Number(turma?.total ?? turma?.vagas ?? 0) || 0;
+  const ocupadas = norm.inscritos + norm.pendentes + norm.matriculados;
+  return {
+    ...turma,
+    total,
+    ocupadas,
+    disponiveis: Math.max(0, total - ocupadas),
+    inscritos: norm.inscritos,
+    pendentes: norm.pendentes,
+    matriculados: norm.matriculados
+  };
 }
 
 function ordenarDisciplinas(disciplinas) {
@@ -1869,16 +1905,14 @@ function expandirHistorico(segmentos, inicio, fim) {
       serie.push({ data, ofertada: null, inscritos: null, pendentes: null, matriculados: null, pessoas: null });
       continue;
     }
-    const inscritos = Number(segmento.inscritos || 0);
-    const pendentes = Number(segmento.pendentes || 0);
-    const matriculados = Number(segmento.matriculados || 0);
+    const norm = normalizarContagemTurma(segmento);
     serie.push({
       data,
       ofertada: Boolean(segmento.ofertada),
-      inscritos,
-      pendentes,
-      matriculados,
-      pessoas: inscritos + pendentes + matriculados
+      inscritos: norm.inscritos,
+      pendentes: norm.pendentes,
+      matriculados: norm.matriculados,
+      pessoas: norm.inscritos + norm.pendentes + norm.matriculados
     });
   }
   return serie;
@@ -1919,7 +1953,12 @@ function salvarIndiceHistorico(env, indice) {
 }
 
 function montarResposta(dados, estado) {
-  const disciplinas = [...(dados.disciplinas || [])];
+  // Normaliza na leitura para corrigir imediatamente registros legados com
+  // inscritos duplicados, sem esperar a próxima varredura completa do cron.
+  const disciplinas = [...(dados.disciplinas || [])].map((disciplina) => ({
+    ...disciplina,
+    turmas: (disciplina.turmas || []).map(normalizarTurmaParaResposta)
+  }));
   ordenarDisciplinas(disciplinas);
   const agora = Date.now();
   return {
