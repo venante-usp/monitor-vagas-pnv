@@ -10,6 +10,25 @@ Monitor automático de disciplinas PNV: o navegador apenas lê os dados do KV. S
 
 Nenhum visitante consegue disparar atualização.
 
+## Ciclo semestral automático
+
+O site separa as turmas por semestre e cuida sozinho da troca de semestre — não há nada para configurar a cada período.
+
+| Situação | O que acontece |
+|---|---|
+| **Ao vivo** | A disciplina aparece no Júpiter e é atualizada pelo cron. |
+| **Congelado** | O Júpiter passou a responder *"Não existe oferecimento para a sigla…"* (o que acontece antes do fim do semestre). O último retrato confirmado continua visível, marcado como congelado. |
+| **Aguardando cadastro** | O próximo semestre aparece como aba vazia ~75 dias antes do fim do atual. Enquanto nenhuma turma estiver viva, a atualização curta percorre a lista oficial inteira (3 siglas a cada 5 min) para detectar a primeira turma nova. |
+| **Arquivado** | 14 dias depois do *Fim* das turmas (ou 60 dias, se o Júpiter nunca retirar a oferta) o semestre é gravado em `monitor:semestre:arquivo:v1:AAAA-S` no KV e sai das abas, ficando no seletor **Arquivo**. |
+
+O semestre de cada turma vem das datas **Início/Fim** que o Júpiter publica em cada turma (com o código da turma `AAAAS##` como alternativa). Por isso turmas do semestre corrente e do seguinte nunca se misturam, mesmo quando aparecem ao mesmo tempo. Sem datas, usa-se o calendário (1º: fev–jul, 2º: ago–dez).
+
+Por padrão o site abre no semestre mais novo com turmas vivas (ex.: período de matrícula); se não houver, no semestre em andamento. Qualquer semestre pode ser aberto por link: `/?semestre=2026-2`.
+
+A API aceita o mesmo parâmetro: `GET /api/monitor?semestre=AAAA-S` e devolve também `semestres` (abas ativas), `arquivo` e `semestrePadrao`.
+
+Para conferir o ciclo localmente, sem rede: `npm test`.
+
 ## Configuração adicional obrigatória para a sincronização pós-deploy
 4
 O deploy executa `wrangler deploy` e, logo depois, cha3ma uma rota administrativa protegida. Você pre4cisa configurar o mesmo segredo em dois lugares.
