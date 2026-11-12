@@ -1,6 +1,9 @@
 /**
- * Monitor de vagas PNV — Cloudflare Workers Free (V27: classificação curricular resiliente)
+ * Monitor de vagas PNV — Cloudflare Workers Free (V28: ciclo semestral automático)
  *
+ * - Turmas são separadas por semestre (datas Início/Fim do Júpiter). Quando o
+ *   Júpiter retira a oferta, o último retrato fica congelado; após o fim do
+ *   semestre, ele é arquivado sozinho e o próximo semestre ocupa a tela.
  * - Interface estática servida pelo próprio Worker.
  * - Dados ficam no Workers KV.
  * - Um Cron a cada 5 min executa as atualizações no servidor.
@@ -46,6 +49,13 @@ const LIMITE_VALOR_HISTORICO_BYTES = 24 * 1024 * 1024; // abaixo de 25 MiB por c
 
 const ROTA_SINCRONIZAR_APOS_DEPLOY = '/internal/sincronizar-apos-deploy';
 
+// Ciclo semestral automático. Semestres encerrados vão para chaves próprias do
+// KV (uma por semestre, poucos KB cada) e deixam a área principal do site.
+const PREFIXO_SEMESTRE_ARQUIVADO = 'monitor:semestre:arquivo:v1:';
+const CARENCIA_ARQUIVAMENTO_DIAS = 14; // após o "Fim" das turmas no Júpiter.
+const LIMITE_ARQUIVAMENTO_FORCADO_DIAS = 60; // arquiva mesmo se o Júpiter ainda exibir.
+const ANTECEDENCIA_PROXIMO_SEMESTRE_DIAS = 75; // mostra "próximo semestre" antes do fim do atual.
+
 // Configuração deliberadamente conservadora.
 // O monitor prioriza consistência dos dados do Júpiter, não velocidade.
 // Cada execução faz poucas consultas, sempre uma por vez, com pausas.
@@ -77,7 +87,7 @@ export default {
       // nem altera o KV. Todas as atualizações acontecem exclusivamente pelo
       // Cron Trigger do Worker, no relógio do servidor.
       const [dados, estado] = await Promise.all([lerDados(env), lerEstado(env)]);
-      return respostaJson(montarResposta(dados, estado));
+      return respostaJson(await montarResposta(dados, estado, env, url.searchParams.get('semestre')));
     }
 
     if (url.pathname === '/api/historico') {
@@ -132,6 +142,9 @@ async function executarCiclo(env, instante) {
 }
 
 async function iniciarScanCompleto(env, dados, estado, hojeBrt, agora, { processarPrimeiroLote = true } = {}) {
+  // Arquivamento/abertura de semestres não depende do Júpiter estar no ar.
+  await manterCicloDeSemestres(env, dados, hojeBrt, agora);
+
   const catalogo = await buscarCatalogoAtual();
   if (!catalogo.ok) throw new Error(`Não foi possível ler a lista PNV: ${catalogo.erro}`);
 
@@ -239,7 +252,7 @@ async function processarLoteCompleto(env, dados, estado, agora) {
 
   for (const tarefa of tarefas) {
     const resultado = porCodigo.get(tarefa.codigo) || { codigo: tarefa.codigo, tipo: 'transitorio', erro: 'Sem resposta' };
-    aplicarResultadoNoScan(dados, full, tarefa, resultado);
+    aplicarResultadoNoScan(dados, full, tarefa, resultado, agora);
   }
 
   dados.ultimaAtualizacao = agora;
@@ -259,9 +272,9 @@ async function processarLoteCompleto(env, dados, estado, agora) {
   await Promise.all([salvarDados(env, dados), salvarEstado(env, estado)]);
 }
 
-function aplicarResultadoNoScan(dados, full, tarefa, resultado) {
+function aplicarResultadoNoScan(dados, full, tarefa, resultado, agora = Date.now()) {
   if (resultado.tipo === 'ofertada') {
-    substituirDisciplina(dados.disciplinas, resultado.disciplina);
+    aplicarOferta(dados, resultado.disciplina, agora);
     full.confirmadas ||= {};
     full.confirmadas[tarefa.codigo] = 'ofertada';
     full.concluidas += 1;
@@ -270,7 +283,7 @@ function aplicarResultadoNoScan(dados, full, tarefa, resultado) {
   }
 
   if (resultado.tipo === 'sem_oferta') {
-    removerDisciplina(dados.disciplinas, tarefa.codigo);
+    aplicarSemOferta(dados, tarefa.codigo, agora);
     full.confirmadas ||= {};
     full.confirmadas[tarefa.codigo] = 'sem_oferta';
     full.concluidas += 1;
@@ -290,7 +303,13 @@ function aplicarResultadoNoScan(dados, full, tarefa, resultado) {
 }
 
 async function executarAtualizacaoCurta(env, dados, estado, agora) {
-  const codigos = (dados.disciplinas || []).map((disciplina) => disciplina.codigo);
+  let codigos = (dados.disciplinas || []).map((disciplina) => disciplina.codigo);
+  if (!codigos.length) {
+    // Entre semestres nada está ofertado. Em vez de ficar parado até a
+    // meia-noite, a atualização curta percorre a lista oficial inteira para
+    // abrir o próximo semestre assim que a primeira turma for cadastrada.
+    codigos = Array.isArray(estado.full?.codigos) ? [...estado.full.codigos] : [];
+  }
   if (!codigos.length) {
     // Não há nada para atualizar: no próximo ciclo o scan diário será refeito se necessário.
     dados.ultimaAtualizacao = agora;
@@ -308,9 +327,9 @@ async function executarAtualizacaoCurta(env, dados, estado, agora) {
   let falhas = 0;
   for (const resultado of resultados) {
     if (resultado.tipo === 'ofertada') {
-      substituirDisciplina(dados.disciplinas, resultado.disciplina);
+      aplicarOferta(dados, resultado.disciplina, agora);
     } else if (resultado.tipo === 'sem_oferta') {
-      removerDisciplina(dados.disciplinas, resultado.codigo);
+      aplicarSemOferta(dados, resultado.codigo, agora);
     } else {
       falhas += 1;
     }
@@ -830,6 +849,13 @@ async function buscarDisciplinaUmaVez(codigo) {
 
   const textoEstruturado = textoEstruturadoDaPagina(resposta.html);
   const texto = normalizarTexto(textoEstruturado.replace(/\u241F/g, ' '));
+
+  // Quando a oferta \u00E9 retirada (fim do per\u00EDodo de consulta p\u00FAblica ou troca de
+  // semestre), o J\u00FApiter n\u00E3o devolve a p\u00E1gina da disciplina: devolve apenas a
+  // mensagem "N\u00E3o existe oferecimento para a sigla XXX". Antes isso era lido
+  // como resposta incompleta e as turmas antigas ficavam no site para sempre.
+  if (paginaConfirmaInexistenciaDeOferta(texto, codigo)) return { codigo, tipo: 'sem_oferta' };
+
   if (!paginaConfirmaDisciplina(texto, codigo)) {
     return { codigo, tipo: 'transitorio', erro: 'Resposta intermediária ou incompleta.' };
   }
@@ -989,6 +1015,12 @@ function paginaConfirmaDisciplina(texto, codigo) {
     && /Lista\s+de\s+Turmas|Clique\s+para\s+consultar/i.test(texto);
 }
 
+function paginaConfirmaInexistenciaDeOferta(texto, codigo) {
+  // O Júpiter às vezes entrega "Não" com o "ã" corrompido ("N?o", "N�o").
+  const codigoSeguro = String(codigo).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\bN\\S{1,2}o\\s+existe\\s+oferecimento\\s+para\\s+a\\s+sigla\\s+${codigoSeguro}\\b`, 'i').test(texto);
+}
+
 function paginaIndicaCodigoDeTurma(texto) {
   return /C(?:[oó]| )digo\s+da\s+Turma\s*:\s*\d+/i.test(texto);
 }
@@ -1038,6 +1070,8 @@ function extrairTurmas(texto, textoEstruturado = '', html = '') {
     );
     const tipo = extrairTipoTurma(antesDasVagas);
     const teoricaVinculada = extrairTurmaTeoricaVinculada(antesDasVagas);
+    const periodoTurma = extrairPeriodoDaTurma(antesDasVagas);
+    const semestre = identificarSemestreDaTurma(codigo, periodoTurma.inicio);
 
     for (const categoria of extrairCategorias(bloco.slice(posicaoVagas))) {
       const ocupadas = categoria.inscritos + categoria.pendentes + categoria.matriculados;
@@ -1050,6 +1084,9 @@ function extrairTurmas(texto, textoEstruturado = '', html = '') {
         grupoTurma: teoricaVinculada || codigo,
         tipoTurma: tipo,
         turmaTeoricaVinculada: teoricaVinculada,
+        inicio: periodoTurma.inicio,
+        fim: periodoTurma.fim,
+        semestre,
         horario,
         professores,
         dia: extrairDias(horario),
@@ -1074,6 +1111,18 @@ function extrairTipoTurma(texto) {
 
 function extrairTurmaTeoricaVinculada(texto) {
   return texto.match(/C(?:[oó]| )digo\s+da\s+Turma\s+Te(?:[oó]| )rica\s*:\s*(\d+)/i)?.[1] || null;
+}
+
+/**
+ * Cada turma do Júpiter traz "Início: dd/mm/aaaa" e "Fim: dd/mm/aaaa". São
+ * essas datas que permitem separar turmas do semestre corrente das turmas do
+ * próximo semestre quando as duas aparecem ao mesmo tempo.
+ */
+function extrairPeriodoDaTurma(texto) {
+  const fonte = String(texto || '');
+  const inicio = fonte.match(/\bIn\S{1,2}cio\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i)?.[1];
+  const fim = fonte.match(/\bFim\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i)?.[1];
+  return { inicio: normalizarDataJupiter(inicio), fim: normalizarDataJupiter(fim) };
 }
 
 function extrairHorario(texto) {
@@ -1520,6 +1569,330 @@ function ordenarDisciplinas(disciplinas) {
 
 
 /**
+ * Ciclo automático de semestres.
+ *
+ * O Júpiter só mostra as turmas "vivas". Quando o período de consulta pública
+ * termina, a página passa a dizer que não existe oferecimento, mesmo com o
+ * semestre ainda em andamento; mais tarde aparecem as turmas do semestre
+ * seguinte. Para que essas fases não se misturem, cada turma é atribuída a um
+ * semestre (pelas datas Início/Fim informadas pelo Júpiter ou pelo código da
+ * turma, AAAAS##) e guardada em um compartimento próprio:
+ *
+ * - ao vivo: a disciplina ainda aparece no Júpiter e é atualizada pelo cron;
+ * - congelada: o Júpiter retirou a oferta, mas o semestre ainda não acabou —
+ *   o último retrato confirmado continua visível, marcado como congelado;
+ * - arquivada: passado o fim do semestre (mais uma carência), o compartimento
+ *   inteiro é gravado em uma chave própria do KV e sai da tela principal,
+ *   ficando disponível no seletor "Arquivo".
+ *
+ * Um semestre novo é aberto sozinho na primeira turma encontrada com outro
+ * período. Antes disso, o próximo semestre aparece como "aguardando cadastro".
+ * Nada aqui depende de configuração manual a cada semestre.
+ */
+function semestreDeData(dataIso) {
+  const achado = String(dataIso || '').match(/^(\d{4})-(\d{2})-\d{2}$/);
+  if (!achado) return null;
+  return `${achado[1]}-${Number(achado[2]) <= 7 ? 1 : 2}`;
+}
+
+function identificarSemestreDaTurma(codigoTurma, inicio) {
+  // As datas da própria turma são a fonte mais confiável.
+  const porData = semestreDeData(inicio);
+  if (porData) return porData;
+  // Códigos de turma do Júpiter seguem AAAA + semestre + sequência (ex.: 2026201).
+  const achado = String(codigoTurma || '').match(/^(20\d{2})([12])\d{2}$/);
+  return achado ? `${achado[1]}-${achado[2]}` : null;
+}
+
+function semestreValido(id) { return /^\d{4}-[12]$/.test(String(id || '')); }
+
+function compararSemestres(a, b) { return String(a).localeCompare(String(b)); }
+
+function proximoSemestre(id) {
+  const [ano, periodo] = String(id).split('-').map(Number);
+  return periodo === 1 ? `${ano}-2` : `${ano + 1}-1`;
+}
+
+function rotuloSemestre(id) {
+  const [ano, periodo] = String(id).split('-');
+  return `${periodo}º semestre de ${ano}`;
+}
+
+function limitesCalendarioSemestre(id) {
+  // Usado só enquanto o Júpiter ainda não informou as datas reais das turmas.
+  const [ano, periodo] = String(id).split('-');
+  return periodo === '1'
+    ? { inicio: `${ano}-02-01`, fim: `${ano}-07-31` }
+    : { inicio: `${ano}-08-01`, fim: `${ano}-12-31` };
+}
+
+function limitesDoSemestre(id, disciplinas) {
+  let inicio = null;
+  let fim = null;
+  for (const disciplina of disciplinas || []) {
+    for (const turma of disciplina.turmas || []) {
+      if (turma.inicio && (!inicio || turma.inicio < inicio)) inicio = turma.inicio;
+      if (turma.fim && (!fim || turma.fim > fim)) fim = turma.fim;
+    }
+  }
+  const calendario = limitesCalendarioSemestre(id);
+  return {
+    inicio: inicio || calendario.inicio,
+    fim: fim || calendario.fim,
+    fonteDatas: inicio && fim ? 'jupiter' : (inicio || fim ? 'parcial' : 'calendario')
+  };
+}
+
+function statusDoSemestre(limites, hojeBrt) {
+  if (hojeBrt < limites.inicio) return 'proximo';
+  if (hojeBrt > limites.fim) return 'encerrado';
+  return 'em_andamento';
+}
+
+function separarTurmasPorSemestre(disciplina, agora) {
+  const grupos = new Map();
+  const semSemestre = [];
+  for (const turma of disciplina.turmas || []) {
+    const semestre = semestreValido(turma.semestre) ? turma.semestre : identificarSemestreDaTurma(turma.codigo, turma.inicio);
+    if (!semestre) { semSemestre.push(turma); continue; }
+    if (!grupos.has(semestre)) grupos.set(semestre, []);
+    grupos.get(semestre).push({ ...turma, semestre });
+  }
+
+  if (semSemestre.length) {
+    // Turma sem data nem código reconhecível: acompanha as irmãs da mesma
+    // disciplina; sem referência, vai para o semestre do calendário.
+    const referencia = [...grupos.keys()].sort(compararSemestres).at(-1)
+      || semestreDeData(dataBrt(disciplina.atualizadaEm || agora));
+    if (!grupos.has(referencia)) grupos.set(referencia, []);
+    grupos.get(referencia).push(...semSemestre.map((turma) => ({ ...turma, semestre: referencia })));
+  }
+  return grupos;
+}
+
+function garantirEstruturaSemestral(dados, agora = Date.now()) {
+  dados.arquivo ||= [];
+  if (dados.semestres && typeof dados.semestres === 'object') return dados;
+
+  // Migração dos dados anteriores ao ciclo semestral: o que estava no monitor
+  // é distribuído nos semestres a que cada turma pertence.
+  dados.semestres = {};
+  for (const disciplina of dados.disciplinas || []) {
+    registrarOfertaNosSemestres(dados, disciplina, Number(disciplina.atualizadaEm) || agora, { migracao: true });
+  }
+  return dados;
+}
+
+function registrarOfertaNosSemestres(dados, disciplina, agora, { migracao = false } = {}) {
+  dados.semestres ||= {};
+  const arquivados = new Set((dados.arquivo || []).map((item) => item.id));
+  const grupos = separarTurmasPorSemestre(disciplina, agora);
+
+  for (const [semestre, turmas] of grupos) {
+    // Um semestre já arquivado não é reaberto por uma leitura tardia.
+    if (arquivados.has(semestre)) continue;
+    const compartimento = dados.semestres[semestre] ||= { id: semestre, criadoEm: agora, disciplinas: {} };
+    compartimento.atualizadoEm = agora;
+    const anterior = compartimento.disciplinas[disciplina.codigo];
+    compartimento.disciplinas[disciplina.codigo] = {
+      codigo: disciplina.codigo,
+      nome: disciplina.nome,
+      turmas,
+      atualizadaEm: disciplina.atualizadaEm || agora,
+      noJupiter: true,
+      vistaNoJupiterEm: migracao ? (anterior?.vistaNoJupiterEm || disciplina.atualizadaEm || agora) : agora,
+      retiradaDoJupiterEm: null
+    };
+  }
+
+  // Se a disciplina tinha turmas em outro semestre e elas sumiram do Júpiter,
+  // aquele retrato é congelado (não apagado).
+  for (const [semestre, compartimento] of Object.entries(dados.semestres)) {
+    if (grupos.has(semestre)) continue;
+    congelarNoCompartimento(compartimento, disciplina.codigo, agora);
+  }
+}
+
+function registrarRetiradaNosSemestres(dados, codigo, agora) {
+  for (const compartimento of Object.values(dados.semestres || {})) {
+    congelarNoCompartimento(compartimento, codigo, agora);
+  }
+}
+
+function congelarNoCompartimento(compartimento, codigo, agora) {
+  const item = compartimento?.disciplinas?.[codigo];
+  if (!item || !item.noJupiter) return;
+  item.noJupiter = false;
+  item.retiradaDoJupiterEm = agora;
+  compartimento.atualizadoEm = agora;
+}
+
+function aplicarOferta(dados, disciplina, agora) {
+  substituirDisciplina(dados.disciplinas, disciplina);
+  registrarOfertaNosSemestres(dados, disciplina, agora);
+}
+
+function aplicarSemOferta(dados, codigo, agora) {
+  removerDisciplina(dados.disciplinas, codigo);
+  registrarRetiradaNosSemestres(dados, codigo, agora);
+}
+
+/**
+ * Executado a cada varredura diária. Arquiva semestres encerrados e descarta
+ * compartimentos vazios que já passaram. É idempotente: rodar duas vezes no
+ * mesmo dia não muda nada.
+ */
+async function manterCicloDeSemestres(env, dados, hojeBrt, agora) {
+  garantirEstruturaSemestral(dados, agora);
+
+  for (const [id, compartimento] of Object.entries(dados.semestres)) {
+    const disciplinas = Object.values(compartimento.disciplinas || {});
+    const limites = limitesDoSemestre(id, disciplinas);
+    const fimComCarencia = deslocarData(limites.fim, CARENCIA_ARQUIVAMENTO_DIAS);
+    const fimForcado = deslocarData(limites.fim, LIMITE_ARQUIVAMENTO_FORCADO_DIAS);
+    const aindaNoJupiter = disciplinas.some((disciplina) => disciplina.noJupiter);
+
+    if (!disciplinas.length) {
+      if (hojeBrt > fimComCarencia) delete dados.semestres[id];
+      continue;
+    }
+
+    // Espera o Júpiter retirar a oferta; se ele nunca retirar, arquiva mesmo
+    // assim depois de um prazo longo para não acumular semestres na tela.
+    if (hojeBrt > fimForcado || (hojeBrt > fimComCarencia && !aindaNoJupiter)) {
+      await arquivarSemestre(env, dados, id, compartimento, limites, agora);
+    }
+  }
+}
+
+async function arquivarSemestre(env, dados, id, compartimento, limites, agora) {
+  const chave = chaveSemestreArquivado(id);
+  const existente = await lerJson(env, chave);
+  const porCodigo = new Map((existente?.disciplinas || []).map((disciplina) => [disciplina.codigo, disciplina]));
+  for (const disciplina of Object.values(compartimento.disciplinas || {})) {
+    porCodigo.set(disciplina.codigo, { ...disciplina, noJupiter: false });
+  }
+
+  const disciplinas = [...porCodigo.values()];
+  ordenarDisciplinas(disciplinas);
+  const limitesFinais = limitesDoSemestre(id, disciplinas);
+  const registro = {
+    versao: 1,
+    id,
+    rotulo: rotuloSemestre(id),
+    inicio: limitesFinais.inicio || limites.inicio,
+    fim: limitesFinais.fim || limites.fim,
+    fonteDatas: limitesFinais.fonteDatas,
+    arquivadoEm: existente?.arquivadoEm || agora,
+    atualizadoEm: agora,
+    disciplinas
+  };
+
+  // Grava primeiro o arquivo; só depois remove o semestre da área ativa.
+  await env.PNV_MONITOR.put(chave, JSON.stringify(registro));
+
+  dados.arquivo = (dados.arquivo || []).filter((item) => item.id !== id);
+  dados.arquivo.push({
+    id,
+    rotulo: registro.rotulo,
+    inicio: registro.inicio,
+    fim: registro.fim,
+    fonteDatas: registro.fonteDatas,
+    arquivadoEm: registro.arquivadoEm,
+    totalDisciplinas: disciplinas.length,
+    totalTurmas: contarTurmas(disciplinas)
+  });
+  dados.arquivo.sort((a, b) => compararSemestres(b.id, a.id));
+  delete dados.semestres[id];
+}
+
+function contarTurmas(disciplinas) {
+  const codigos = new Set();
+  for (const disciplina of disciplinas || []) {
+    for (const turma of disciplina.turmas || []) codigos.add(`${disciplina.codigo}|${turma.codigo}`);
+  }
+  return codigos.size;
+}
+
+function chaveSemestreArquivado(id) { return `${PREFIXO_SEMESTRE_ARQUIVADO}${id}`; }
+
+/** Lista de semestres exibida no site: ativos, próximo (placeholder) e arquivo. */
+function listarSemestres(dados, hojeBrt) {
+  const arquivados = new Set((dados.arquivo || []).map((item) => item.id));
+  const ativos = new Map(Object.entries(dados.semestres || {}));
+
+  const calendarioAtual = semestreDeData(hojeBrt);
+  if (!ativos.has(calendarioAtual) && !arquivados.has(calendarioAtual)) {
+    ativos.set(calendarioAtual, { id: calendarioAtual, disciplinas: {}, placeholder: true });
+  }
+
+  // Abre o próximo semestre na tela assim que o atual se aproxima do fim,
+  // mesmo que o Júpiter ainda não tenha nenhuma turma cadastrada.
+  // A referência considera também o arquivo e o calendário: entre semestres,
+  // quando tudo já foi arquivado, o seguinte continua aparecendo.
+  const maisRecente = [...ativos.keys(), ...arquivados, calendarioAtual].filter(semestreValido).sort(compararSemestres).at(-1);
+  if (maisRecente) {
+    const disciplinasReferencia = Object.values(ativos.get(maisRecente)?.disciplinas || {});
+    const limites = limitesDoSemestre(maisRecente, disciplinasReferencia);
+    const seguinte = proximoSemestre(maisRecente);
+    const referenciaEncerrada = arquivados.has(maisRecente) || hojeBrt > limites.fim;
+    if ((referenciaEncerrada || hojeBrt >= deslocarData(limites.fim, -ANTECEDENCIA_PROXIMO_SEMESTRE_DIAS)) && !arquivados.has(seguinte)) {
+      ativos.set(seguinte, { id: seguinte, disciplinas: {}, placeholder: true });
+    }
+  }
+
+  const lista = [...ativos.entries()].sort(([a], [b]) => compararSemestres(a, b)).map(([id, compartimento]) => {
+    const disciplinas = Object.values(compartimento.disciplinas || {});
+    const limites = limitesDoSemestre(id, disciplinas);
+    const noJupiter = disciplinas.filter((disciplina) => disciplina.noJupiter).length;
+    const situacao = !disciplinas.length ? 'aguardando'
+      : noJupiter === disciplinas.length ? 'ao_vivo'
+      : noJupiter ? 'parcial' : 'congelado';
+    const retiradas = disciplinas.map((disciplina) => Number(disciplina.retiradaDoJupiterEm) || 0).filter(Boolean);
+    const status = statusDoSemestre(limites, hojeBrt);
+    return {
+      id,
+      rotulo: rotuloSemestre(id),
+      inicio: limites.inicio,
+      fim: limites.fim,
+      fonteDatas: limites.fonteDatas,
+      status,
+      situacao,
+      arquivado: false,
+      totalDisciplinas: disciplinas.length,
+      disciplinasNoJupiter: noJupiter,
+      totalTurmas: contarTurmas(disciplinas),
+      congeladoEm: situacao === 'congelado' && retiradas.length ? Math.max(...retiradas) : null,
+      arquivamentoPrevistoEm: deslocarData(limites.fim, CARENCIA_ARQUIVAMENTO_DIAS)
+    };
+  });
+
+  const arquivo = [...(dados.arquivo || [])]
+    .sort((a, b) => compararSemestres(b.id, a.id))
+    .map((item) => ({ ...item, rotulo: item.rotulo || rotuloSemestre(item.id), status: 'encerrado', situacao: 'arquivado', arquivado: true }));
+
+  return { ativos: lista, arquivo };
+}
+
+function escolherSemestrePadrao(ativos) {
+  const comDados = ativos.filter((item) => item.totalDisciplinas);
+  // 1) o semestre mais novo com turmas vivas no Júpiter (ex.: período de matrícula);
+  const aoVivo = comDados.filter((item) => item.disciplinasNoJupiter).at(-1);
+  if (aoVivo) return aoVivo.id;
+  // 2) o semestre em andamento, mesmo congelado;
+  const emAndamento = comDados.find((item) => item.status === 'em_andamento');
+  if (emAndamento) return emAndamento.id;
+  // 3) o mais recente com dados; 4) o primeiro da lista.
+  return comDados.at(-1)?.id || ativos.find((item) => item.status !== 'encerrado')?.id || ativos.at(-1)?.id || null;
+}
+
+function turmasDoSemestreMaisRecente(disciplina) {
+  const grupos = separarTurmasPorSemestre(disciplina, Date.now());
+  const maisRecente = [...grupos.keys()].sort(compararSemestres).at(-1);
+  return maisRecente ? grupos.get(maisRecente) : (disciplina.turmas || []);
+}
+
+/**
  * Histórico diário sem prazo fixo de retenção.
  *
  * O histórico anterior (V1) ficava inteiro em uma única chave e era limitado a
@@ -1571,7 +1944,9 @@ async function registrarSnapshotDiario(env, dados, full, agora) {
 
     let estado;
     if (situacao === 'ofertada' && disciplina) {
-      const pessoas = resumirPessoas(disciplina);
+      // Se o Júpiter exibir dois semestres ao mesmo tempo, o histórico diário
+      // acompanha o mais novo em vez de somar turmas de períodos diferentes.
+      const pessoas = resumirPessoas({ ...disciplina, turmas: turmasDoSemestreMaisRecente(disciplina) });
       estado = {
         ofertada: true,
         inscritos: pessoas.inscritos,
@@ -1952,17 +2327,39 @@ function salvarIndiceHistorico(env, indice) {
   return env.PNV_MONITOR.put(KEY_HISTORICO_INDICE, JSON.stringify(indice));
 }
 
-function montarResposta(dados, estado) {
+async function montarResposta(dados, estado, env, semestreSolicitado = null) {
+  const agora = Date.now();
+  const hojeBrt = dataBrt(agora);
+  const { ativos, arquivo } = listarSemestres(dados, hojeBrt);
+  const semestrePadrao = escolherSemestrePadrao(ativos);
+  const pedido = semestreValido(semestreSolicitado) ? semestreSolicitado : null;
+
+  let semestre = ativos.find((item) => item.id === (pedido || semestrePadrao))
+    || arquivo.find((item) => item.id === pedido)
+    || ativos.find((item) => item.id === semestrePadrao)
+    || null;
+
+  let base = [];
+  if (semestre?.arquivado) {
+    const registro = await lerJson(env, chaveSemestreArquivado(semestre.id));
+    base = registro?.disciplinas || [];
+  } else if (semestre) {
+    base = Object.values(dados.semestres?.[semestre.id]?.disciplinas || {});
+  }
+
   // Normaliza na leitura para corrigir imediatamente registros legados com
   // inscritos duplicados, sem esperar a próxima varredura completa do cron.
-  const disciplinas = [...(dados.disciplinas || [])].map((disciplina) => ({
+  const disciplinas = base.map((disciplina) => ({
     ...disciplina,
     turmas: (disciplina.turmas || []).map(normalizarTurmaParaResposta)
   }));
   ordenarDisciplinas(disciplinas);
-  const agora = Date.now();
   return {
     disciplinas,
+    semestre,
+    semestrePadrao,
+    semestres: ativos,
+    arquivo,
     desativadas: [...(dados.desativadas || [])].sort((a, b) => String(b.desativacao || '').localeCompare(String(a.desativacao || '')) || a.codigo.localeCompare(b.codigo)),
     curriculo: dados.curriculo || { versao: 1, atualizadoEm: null, porCodigo: {}, fontes: [] },
     meta: {
@@ -1974,6 +2371,10 @@ function montarResposta(dados, estado) {
       disciplinasDesativadas: (dados.desativadas || []).length,
       ultimoErro: dados.ultimoErro || null,
       proximaAtualizacaoCurta: proximoMultiploDeCincoMinutos(agora),
+      // Sem nenhuma turma viva no Júpiter, a atualização curta varre a lista
+      // oficial completa à procura das turmas do próximo semestre.
+      atualizacaoCurtaModo: (dados.disciplinas || []).length ? 'ofertadas' : 'procurando_novas_turmas',
+      disciplinasNoJupiter: (dados.disciplinas || []).length,
       proximaConsultaCompleta: proximaMeiaNoiteBrt(agora),
       inicializacaoEmAndamento: false,
       fullScan: estado.full ? {
@@ -2001,13 +2402,15 @@ function salvarHistorico(env, historico) {
 }
 
 async function lerDados(env) {
-  return (await lerJson(env, KEY_DADOS)) || {
+  const dados = (await lerJson(env, KEY_DADOS)) || {
     disciplinas: [],
     desativadas: [],
     curriculo: { versao: 1, atualizadoEm: null, porCodigo: {}, fontes: [] },
     ultimaAtualizacao: null,
     ultimoErro: null
   };
+  dados.disciplinas ||= [];
+  return garantirEstruturaSemestral(dados);
 }
 
 async function lerEstado(env) {
