@@ -6,7 +6,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy && node scripts/trigger-deploy-sync.mjs",
     "deploy:only": "wrangler deploy",
-    "test": "node test/ciclo-semestral.test.mjs && node test/leitura-jupiter.test.mjs"
+    "test": "node test/ciclo-semestral.test.mjs && node test/leitura-jupiter.test.mjs && node test/cartoes.test.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
