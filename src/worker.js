@@ -1359,12 +1359,13 @@ function limparPossivelProfessor(valor) {
 const CONECTIVOS_DE_NOME = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'di', 'du', 'del', 'della', 'van', 'von', 'der', 'den', 'la', 'le', 'y', 'd']);
 
 // Palavras dos rótulos do Júpiter que nunca fazem parte do nome de um docente.
+// Ficam de fora palavras que também são sobrenomes ("da Hora", "Domingo").
 // Basta uma delas para descartar o texto. Exemplos reais que apareciam como
 // professor: "Atividades Didáticas", "Tipo de Atividade", "Carga horária
 // (total)" e "Atividades de extensão" (tabela de atividades didáticas da turma).
 const PALAVRAS_DE_ROTULO = new Set([
   'atividade', 'atividades', 'didatica', 'didaticas', 'tipo', 'tipos', 'carga', 'horaria', 'horarias', 'horario', 'horarios',
-  'hora', 'horas', 'total', 'extensao', 'extensionista', 'extensionistas', 'turma', 'turmas', 'vaga', 'vagas', 'inscritos',
+  'total', 'extensao', 'extensionista', 'extensionistas', 'turma', 'turmas', 'vaga', 'vagas', 'inscritos',
   'pendentes', 'matriculados', 'disciplina', 'disciplinas', 'pratica', 'praticas', 'pratico', 'praticos', 'teorica',
   'teoricas', 'teorico', 'teoricos', 'laboratorio', 'laboratorios', 'aula', 'aulas', 'docente', 'docentes', 'responsavel',
   'responsaveis', 'observacao', 'observacoes', 'codigo', 'semestre', 'periodo', 'credito', 'creditos', 'programa',
@@ -1373,7 +1374,7 @@ const PALAVRAS_DE_ROTULO = new Set([
   'politecnica', 'engenharia', 'usp', 'curso', 'cursos', 'habilitacao', 'departamento', 'instituto', 'faculdade',
   'remoto', 'remota', 'presencial', 'online', 'ead', 'hibrido', 'hibrida', 'requisito', 'requisitos', 'ementa',
   'bibliografia', 'clique', 'consultar', 'lista', 'oferecidas', 'oferecida', 'inicio', 'fim', 'data', 'datas',
-  'informado', 'informada', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo', 'conteudo',
+  'informado', 'informada', 'conteudo',
   'metodologia', 'orientacao', 'estudo', 'estudos', 'dirigido', 'dirigidos', 'exercicio', 'exercicios', 'atendimento',
   'plantao', 'reposicao', 'tutoria', 'oficina', 'oficinas', 'visita', 'visitas', 'tecnica', 'tecnicas', 'vinculada',
   'vinculadas', 'nao', 'sem'
@@ -1392,9 +1393,10 @@ function pareceNomeDeProfessor(valor) {
     if (!base) return false;
     if (CONECTIVOS_DE_NOME.has(base)) continue;
     if (PALAVRAS_DE_ROTULO.has(base)) return false;
-    // Cada parte de um nome começa com maiúscula ("Oliveira"); rótulos
-    // costumam ter palavras em minúsculas ("horária", "extensão").
-    if (!/^[A-ZÀ-ÖØ-Þ]/.test(parte)) return false;
+    // Cada parte de um nome começa com maiúscula ("Oliveira"), exceto a
+    // partícula "d'" ("d'Ávila"); rótulos costumam ter palavras em minúsculas
+    // ("horária", "extensão").
+    if (!/^[A-ZÀ-ÖØ-Þ]/.test(parte) && !/^d['’][A-ZÀ-ÖØ-Þ]/.test(parte)) return false;
     if (!/^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ.'’-]*$/.test(parte)) return false;
     if (base.length >= 2) palavras += 1;
   }

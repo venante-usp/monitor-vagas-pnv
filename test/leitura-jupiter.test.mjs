@@ -98,7 +98,7 @@ kv.set('monitor:latest', JSON.stringify({
     {
       codigo: 'PNV3100', nome: 'PNV3100 - Introdução ao Projeto de Engenharia', atualizadaEm,
       // "inscritos" já gravado como "aguardando" (bruto - pendentes - matriculados).
-      turmas: [{ codigo: '2026201', categoria: 'Obrigatória', total: 60, inscritos: 10, pendentes: 0, matriculados: 45, horario: 'ter 07:30 09:10', professores: ['Fulano de Tal'] }]
+      turmas: [{ codigo: '2026201', categoria: 'Obrigatória', total: 60, inscritos: 10, pendentes: 0, matriculados: 45, horario: 'ter 07:30 09:10', professores: ['Fulano de Tal', 'Fabiana da Hora Santos', "Luiza d'Ávila Prado", 'Pedro Domingo Ruiz'] }]
     }
   ],
   desativadas: [],
@@ -149,6 +149,9 @@ assert.equal(t3100.disponiveis, 5);
 assert.equal(t3412[1].inscritosTotal, 4, 'total do Júpiter reconstruído: 2 + 1 + 1');
 assert.equal(t3412[1].cursos[0].inscritosTotal, 4);
 assert.equal(t3100.inscritosTotal, 55);
+// Sobrenomes que também são palavras comuns ("da Hora", "Domingo") e a
+// partícula "d'" em minúscula continuam sendo nomes de docentes.
+assert.deepEqual(t3100.professores, ['Fulano de Tal', 'Fabiana da Hora Santos', "Luiza d'Ávila Prado", 'Pedro Domingo Ruiz']);
 
 // ---------------------------------------------------------------------------
 // 2) Página nova do Júpiter (formato real) é lida corretamente.
