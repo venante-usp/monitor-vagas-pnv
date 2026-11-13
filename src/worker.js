@@ -1074,8 +1074,13 @@ function extrairTurmas(texto, textoEstruturado = '', html = '') {
     const periodoTurma = extrairPeriodoDaTurma(antesDasVagas);
     const semestre = identificarSemestreDaTurma(codigo, periodoTurma.inicio);
 
-    const cursosDaTurma = cursosPorTurma.get(codigo) || new Map();
+    const vagasDaTurma = cursosPorTurma.get(codigo) || { porCategoria: new Map(), grupos: [] };
+    const cursosDaTurma = vagasDaTurma.porCategoria;
+    const linhasDeCurso = new Set(vagasDaTurma.grupos.map(assinaturaLinhaDeVaga));
     for (const categoria of extrairCategorias(bloco.slice(posicaoVagas))) {
+      // Ex.: "Qualquer Unidade da USP" abaixo de "Optativa Livre" é uma linha de
+      // curso; contá-la como tipo de vaga duplicava as vagas e as pessoas.
+      if (!REGEX_TIPO_VAGA.test(categoria.nome) && linhasDeCurso.has(assinaturaLinhaDeVaga(categoria))) continue;
       const ocupadas = categoria.inscritos + categoria.pendentes + categoria.matriculados;
       const chave = [codigo, categoria.nome, categoria.vagas, categoria.inscritos, categoria.pendentes, categoria.matriculados].join('|');
       if (vistas.has(chave)) continue;
@@ -1098,6 +1103,7 @@ function extrairTurmas(texto, textoEstruturado = '', html = '') {
         ocupadas,
         disponiveis: Math.max(0, categoria.vagas - ocupadas),
         inscritos: categoria.inscritos,
+        inscritosTotal: categoria.inscritosTotal,
         pendentes: categoria.pendentes,
         matriculados: categoria.matriculados
       });
@@ -1128,13 +1134,49 @@ function extrairPeriodoDaTurma(texto) {
   return { inicio: normalizarDataJupiter(inicio), fim: normalizarDataJupiter(fim) };
 }
 
+/**
+ * A tabela de horário do Júpiter tem uma linha por encontro: dia | início |
+ * fim | professor. Linhas sem dia continuam o dia anterior, e o professor fica
+ * entre um encontro e outro no texto da página. Por isso lemos todos os pares
+ * de horário do trecho, e não só a primeira sequência (que perdia o segundo
+ * encontro da semana).
+ */
 function extrairHorario(texto) {
+  const fonte = String(texto || '');
+  const inicioHorario = fonte.search(/Hor[aá]rio\b/i);
+  if (inicioHorario >= 0) {
+    let trecho = fonte.slice(inicioHorario);
+    const fimTrecho = trecho.search(/Atividades\s+Did\S{1,2}ticas|Vagas\s+Inscritos\s+Pendentes\s+Matriculados/i);
+    if (fimTrecho > 0) trecho = trecho.slice(0, fimTrecho);
+
+    const encontros = [];
+    let diaAtual = null;
+    const regex = /(?:\b(seg|ter|qua|qui|sex|s[aá]b|dom)\s+)?\b(\d{1,2}:\d{2})\s+(\d{1,2}:\d{2})\b/gi;
+    for (const achado of trecho.matchAll(regex)) {
+      const dia = (achado[1] || diaAtual || '').toLowerCase();
+      if (!dia) continue;
+      diaAtual = dia;
+      const encontro = `${dia} ${achado[2]} ${achado[3]}`;
+      if (!encontros.includes(encontro)) encontros.push(encontro);
+    }
+    if (encontros.length) return encontros.join(' ');
+  }
+  return extrairHorarioLegado(fonte);
+}
+
+function extrairHorarioLegado(texto) {
   const achado = texto.match(/Hor[aá]rio\s*(?:Prof\.?\(a\)\.?\s*)?(.*)$/i);
   const bruto = normalizarTexto(achado?.[1] || '');
   const limite = bruto.search(/\b(?:Vagas|Prof\.?\(a\)?)\b/i);
   const base = limite >= 0 ? bruto.slice(0, limite) : bruto;
   const horario = base.match(/(?:(?:seg|ter|qua|qui|sex|s[aá]b|dom)\s+\d{1,2}:\d{2}\s+\d{1,2}:\d{2}(?:\s*\([^)]*\))?\s*)+/i)?.[0];
-  return normalizarTexto(horario || base) || 'Horário não informado';
+  return limparHorario(horario || base);
+}
+
+// Remove do horário marcadores que pertencem ao professor, como "(R)".
+// Também corrige registros gravados pela versão anterior.
+function limparHorario(horario) {
+  return normalizarTexto(String(horario || '').replace(/\(\s*[A-Za-z]\s*\)/g, ' ')) || 'Horário não informado';
 }
 
 /**
@@ -1301,25 +1343,66 @@ function extrairProfessoresDaLinhaDeTabela(campos) {
 
 function limparPossivelProfessor(valor) {
   return normalizarTexto(String(valor || '')
-    .replace(/^\s*Hor[aá]rio\s*(?:Prof\.?\(a\)?\.?\s*)?/i, ' ')
-    .replace(/^\s*Prof\.?\(a\)?\.?\s*/i, ' ')
+    .replace(/^\s*Hor[aá]rio\s*(?:Prof\.?\s*\(a\)\.?\s*)?/i, ' ')
     .replace(/\b(?:seg|ter|qua|qui|sex|s[aá]b|dom)\b/gi, ' ')
     .replace(/\b\d{1,2}:\d{2}\b/g, ' ')
-    .replace(/\(\s*R\s*\)/gi, ' ')
-    .replace(/\b(?:Hor[aá]rio|Prof\.?\(a\)?\.?|Sala|Local)\b\s*:?/gi, ' ')
-    .replace(/^[-–—·,:;]+|[-–—·,:;]+$/g, ' '));
+    // Marcador de uma letra que o Júpiter põe antes do docente, como "(R)".
+    .replace(/\(\s*[A-Za-z]\s*\)/g, ' ')
+    .replace(/\bProf\.?\s*\(a\)\.?/gi, ' ')
+    .replace(/^\s*(?:(?:Prof(?:essora|essor|a)?|Dra?)\.?\s+)+/i, ' ')
+    .replace(/\b(?:Hor[aá]rio|Sala|Local)\s*:/gi, ' ')
+    .replace(/^[-–—·,:;\s]+|[-–—·,:;\s]+$/g, ' '));
 }
+
+// Conectivos que aparecem em minúsculas dentro de nomes ("Marcos Mendes de
+// Oliveira Pinto", "Ana van der Berg").
+const CONECTIVOS_DE_NOME = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'di', 'du', 'del', 'della', 'van', 'von', 'der', 'den', 'la', 'le', 'y', 'd']);
+
+// Palavras dos rótulos do Júpiter que nunca fazem parte do nome de um docente.
+// Ficam de fora palavras que também são sobrenomes ("da Hora", "Domingo").
+// Basta uma delas para descartar o texto. Exemplos reais que apareciam como
+// professor: "Atividades Didáticas", "Tipo de Atividade", "Carga horária
+// (total)" e "Atividades de extensão" (tabela de atividades didáticas da turma).
+const PALAVRAS_DE_ROTULO = new Set([
+  'atividade', 'atividades', 'didatica', 'didaticas', 'tipo', 'tipos', 'carga', 'horaria', 'horarias', 'horario', 'horarios',
+  'total', 'extensao', 'extensionista', 'extensionistas', 'turma', 'turmas', 'vaga', 'vagas', 'inscritos',
+  'pendentes', 'matriculados', 'disciplina', 'disciplinas', 'pratica', 'praticas', 'pratico', 'praticos', 'teorica',
+  'teoricas', 'teorico', 'teoricos', 'laboratorio', 'laboratorios', 'aula', 'aulas', 'docente', 'docentes', 'responsavel',
+  'responsaveis', 'observacao', 'observacoes', 'codigo', 'semestre', 'periodo', 'credito', 'creditos', 'programa',
+  'seminario', 'seminarios', 'projeto', 'projetos', 'estagio', 'trabalho', 'trabalhos', 'avaliacao', 'prova', 'provas',
+  'monitoria', 'optativa', 'optativas', 'obrigatoria', 'obrigatorias', 'eletiva', 'livre', 'unidade', 'escola',
+  'politecnica', 'engenharia', 'usp', 'curso', 'cursos', 'habilitacao', 'departamento', 'instituto', 'faculdade',
+  'remoto', 'remota', 'presencial', 'online', 'ead', 'hibrido', 'hibrida', 'requisito', 'requisitos', 'ementa',
+  'bibliografia', 'clique', 'consultar', 'lista', 'oferecidas', 'oferecida', 'inicio', 'fim', 'data', 'datas',
+  'informado', 'informada', 'conteudo',
+  'metodologia', 'orientacao', 'estudo', 'estudos', 'dirigido', 'dirigidos', 'exercicio', 'exercicios', 'atendimento',
+  'plantao', 'reposicao', 'tutoria', 'oficina', 'oficinas', 'visita', 'visitas', 'tecnica', 'tecnicas', 'vinculada',
+  'vinculadas', 'nao', 'sem'
+]);
+
+function semAcentos(texto) { return String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
 
 function pareceNomeDeProfessor(valor) {
   const nome = normalizarTexto(valor);
-  if (!nome || nome.length < 5 || /\d/.test(nome)) return false;
-  if (/^(?:Vagas|Inscritos|Pendentes|Matriculados|Observa(?:ç|c)[oõ]es?|In[ií]cio|Fim|Tipo\s+da\s+Turma|Te[oó]rica|Pr[aá]tica|Vinculada|C(?:[oó]| )digo\s+da\s+Turma|Clique\b)/i.test(nome)) return false;
-  if (/\b(?:seg|ter|qua|qui|sex|s[aá]b|dom)\b/i.test(nome)) return false;
+  // Nome de pessoa não tem dígitos, parênteses, dois-pontos, barras etc.
+  if (!nome || nome.length < 5 || /[\d()[\]{}:;\/\\|<>@#%=+*_?!"]/.test(nome)) return false;
 
-  // Docentes no Júpiter são nomes completos. Exigir dois termos evita que
-  // campos como "R" ou "Laboratório" entrem como professor.
-  const palavras = nome.match(/[A-Za-zÀ-ÖØ-öø-ÿ]{2,}/g) || [];
-  return palavras.length >= 2;
+  let palavras = 0;
+  for (const parte of nome.split(' ')) {
+    const base = semAcentos(parte).toLowerCase().replace(/[.'’-]/g, '');
+    if (!base) return false;
+    if (CONECTIVOS_DE_NOME.has(base)) continue;
+    if (PALAVRAS_DE_ROTULO.has(base)) return false;
+    // Cada parte de um nome começa com maiúscula ("Oliveira"), exceto a
+    // partícula "d'" ("d'Ávila"); rótulos costumam ter palavras em minúsculas
+    // ("horária", "extensão").
+    if (!/^[A-ZÀ-ÖØ-Þ]/.test(parte) && !/^d['’][A-ZÀ-ÖØ-Þ]/.test(parte)) return false;
+    if (!/^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ.'’-]*$/.test(parte)) return false;
+    if (base.length >= 2) palavras += 1;
+  }
+
+  // Docentes no Júpiter aparecem com nome e sobrenome.
+  return palavras >= 2;
 }
 
 function adicionarProfessoresAoMapa(mapa, codigo, nomes) {
@@ -1437,10 +1520,7 @@ function normalizarProfessores(nomes) {
 
   for (const nomeOriginal of nomes || []) {
     for (const parte of String(nomeOriginal || '').split(/\u241D|\s*[;|]\s*/)) {
-      const nome = normalizarTexto(parte)
-        .replace(/\b(?:Hor[aá]rio|Prof\.?\(a\)?)\b/gi, '')
-        .replace(/^[-–—·,:;]+|[-–—·,:;]+$/g, '')
-        .trim();
+      const nome = limparPossivelProfessor(parte);
       if (!pareceNomeDeProfessor(nome)) continue;
       const chave = nome.toLocaleLowerCase('pt-BR');
       if (!vistos.has(chave)) {
@@ -1463,9 +1543,12 @@ function extrairDias(horario) {
  * lista para quem as vagas estão reservadas, uma linha por curso/unidade:
  *   Obrigatória                                   60 40 0 30
  *     Escola Politécnica - Engenharia Naval       50 35 0 25
- * Aqui só anotamos esse detalhe em cada tipo de vaga. Os totais continuam
- * vindo exclusivamente das linhas de tipo (extrairCategorias), então uma
- * página sem essas linhas — ou com um layout diferente — não altera a contagem.
+ *     Qualquer Unidade da USP                     10  5 0  5
+ * A linha de curso começa com uma célula vazia; a de tipo, com o nome do tipo.
+ * Esse detalhe é anotado em cada tipo de vaga e também serve para reconhecer
+ * linhas de curso que a leitura por texto confundia com tipos (era o caso de
+ * "Qualquer Unidade da USP", que acabava contada duas vezes). Os totais
+ * continuam vindo das linhas de tipo.
  */
 const REGEX_TIPO_VAGA = /^(Obrigat(?:\S{1,3}|\s)ria|Optativa\s+Eletiva|Optativa\s+Livre|Alunos\s+Especiais|Extracurricular)\b/i;
 
@@ -1493,9 +1576,10 @@ function extrairCursosDasVagasPorTurma(textoEstruturado) {
 
 function extrairCursosDoBlocoDeVagas(bloco) {
   const porCategoria = new Map();
+  const grupos = [];
   const cabecalho = /Vagas\s*\u241F?\s*Inscritos\s*\u241F?\s*Pendentes\s*\u241F?\s*Matriculados\s*\u241F?/i;
   const inicioVagas = bloco.search(cabecalho);
-  if (inicioVagas < 0) return porCategoria;
+  if (inicioVagas < 0) return { porCategoria, grupos };
 
   let categoriaAtual = null;
   for (const linha of bloco.slice(inicioVagas).replace(cabecalho, '').split('\n')) {
@@ -1506,17 +1590,32 @@ function extrairCursosDoBlocoDeVagas(bloco) {
     const nome = normalizarTexto(celulas.slice(0, -4).join(' '));
     if (!nome || !/[A-Za-zÀ-ÿ]{3}/.test(nome)) continue;
 
-    if (REGEX_TIPO_VAGA.test(nome)) {
+    // Linha de tipo: tem nome de tipo conhecido ou não começa com célula vazia.
+    const comecaVazia = /^\s*\u241F/.test(linha);
+    if (REGEX_TIPO_VAGA.test(nome) || !comecaVazia) {
       categoriaAtual = chaveCategoriaVaga(nome);
       if (!porCategoria.has(categoriaAtual)) porCategoria.set(categoriaAtual, []);
       continue;
     }
     if (!categoriaAtual) continue;
 
-    const [vagas, inscritos, pendentes, matriculados] = numeros.map((valor) => (valor === '-' ? 0 : Number(valor)));
-    porCategoria.get(categoriaAtual).push({ nome, vagas, inscritos, pendentes, matriculados });
+    const [vagas, inscritosTotal, pendentes, matriculados] = numeros.map((valor) => (valor === '-' ? 0 : Number(valor)));
+    const curso = {
+      nome,
+      vagas,
+      inscritos: Math.max(0, inscritosTotal - pendentes - matriculados),
+      inscritosTotal,
+      pendentes,
+      matriculados
+    };
+    porCategoria.get(categoriaAtual).push(curso);
+    grupos.push(curso);
   }
-  return porCategoria;
+  return { porCategoria, grupos };
+}
+
+function assinaturaLinhaDeVaga(linha) {
+  return [semAcentos(normalizarTexto(linha.nome)).toLowerCase(), linha.vagas, linha.inscritosTotal, linha.pendentes, linha.matriculados].join('|');
 }
 
 function extrairCategorias(texto) {
@@ -1536,12 +1635,13 @@ const regex = /\b(Obrigat(?:ória| ria)|Optativa\s+Eletiva|Optativa\s+Livre|Alun
   const inscritos = Math.max(0, inscritosBrutos - pendentes - matriculados);
 
   categorias.push({
-   nome: normalizarTexto(encontrado[1]),
-   vagas,
-   inscritos,
-   pendentes,
-   matriculados
-});
+    nome: normalizarTexto(encontrado[1]),
+    vagas,
+    inscritos,
+    inscritosTotal: inscritosBrutos,
+    pendentes,
+    matriculados
+  });
   }
   return categorias;
 }
@@ -1595,36 +1695,101 @@ function somarRegistros(turmas) {
 }
 
 /**
- * O Júpiter informa "Inscritos" como total (pendentes + matriculados +
- * aguardando). Versões antigas do monitor somavam os três como disjuntos,
- * duplicando a ocupação (ex.: 42 inscritos + 42 matriculados em 65 vagas
- * virava 129%). Esta normalização é idempotente: converte dado legado e
- * preserva dado novo, então pode ser aplicada na leitura sem esperar rescan.
+ * O Júpiter informa "Inscritos" como total (aguardando + pendentes +
+ * matriculados). A leitura da página (extrairCategorias) já grava "inscritos"
+ * como quem ainda aguarda, então aqui NÃO se subtrai de novo. A versão
+ * anterior subtraía na leitura da página, de novo ao responder e uma terceira
+ * vez no navegador, zerando os inscritos e mostrando mais vagas livres do que
+ * havia. Todos os registros gravados desde 20/09/2026 já estão nesse formato.
  */
 function normalizarContagemTurma(turma) {
-  const pendentes = Number(turma?.pendentes || 0) || 0;
-  const matriculados = Number(turma?.matriculados || 0) || 0;
-  const inscritosBrutos = Number(turma?.inscritos || 0) || 0;
   return {
-    inscritos: Math.max(0, inscritosBrutos - pendentes - matriculados),
-    pendentes,
-    matriculados
+    inscritos: Math.max(0, Number(turma?.inscritos || 0) || 0),
+    pendentes: Math.max(0, Number(turma?.pendentes || 0) || 0),
+    matriculados: Math.max(0, Number(turma?.matriculados || 0) || 0)
   };
+}
+
+// Segmentos do histórico gravados antes desta data guardavam "inscritos"
+// brutos (versão anterior à normalização de 20/09/2026).
+const INICIO_HISTORICO_NORMALIZADO = '2026-09-20';
+
+function normalizarContagemHistorica(segmento) {
+  const norm = normalizarContagemTurma(segmento);
+  if (String(segmento?.inicio || '') < INICIO_HISTORICO_NORMALIZADO) {
+    norm.inscritos = Math.max(0, norm.inscritos - norm.pendentes - norm.matriculados);
+  }
+  return norm;
+}
+
+// "Inscritos" exatamente como o Júpiter mostra (o total). Registros gravados
+// antes de existir o campo guardam só quem aguarda vaga; o total do Júpiter é
+// esse valor somado a pendentes e matriculados.
+function inscritosTotalDoRegistro(registro) {
+  const total = registro?.inscritosTotal;
+  if (total !== null && total !== undefined && total !== '' && Number.isFinite(Number(total))) return Number(total);
+  const norm = normalizarContagemTurma(registro);
+  return norm.inscritos + norm.pendentes + norm.matriculados;
 }
 
 function normalizarTurmaParaResposta(turma) {
   const norm = normalizarContagemTurma(turma);
   const total = Number(turma?.total ?? turma?.vagas ?? 0) || 0;
   const ocupadas = norm.inscritos + norm.pendentes + norm.matriculados;
+  const horario = limparHorario(turma?.horario);
   return {
     ...turma,
+    // Corrige na leitura registros gravados com rótulos no lugar de docentes
+    // e com o marcador "(R)" no horário, inclusive semestres congelados.
+    horario,
+    dia: extrairDias(horario),
+    professores: normalizarProfessores(turma?.professores || []),
     total,
     ocupadas,
     disponiveis: Math.max(0, total - ocupadas),
     inscritos: norm.inscritos,
+    inscritosTotal: inscritosTotalDoRegistro(turma),
     pendentes: norm.pendentes,
-    matriculados: norm.matriculados
+    matriculados: norm.matriculados,
+    cursos: (turma?.cursos || []).map((curso) => ({ ...curso, inscritosTotal: inscritosTotalDoRegistro(curso) }))
   };
+}
+
+/**
+ * Registros gravados pela versão anterior podem trazer "Qualquer Unidade da
+ * USP" como se fosse um tipo de vaga, logo depois do tipo a que pertence
+ * (ex.: Optativa Livre). Na leitura, essa linha volta a ser o detalhe de curso
+ * do tipo anterior, sem somar vagas nem pessoas duas vezes. Registros novos
+ * (com "inscritosTotal") já chegam separados pela leitura da página.
+ */
+function corrigirRegistrosDeVagasLegados(turmas) {
+  const resultado = [];
+  for (const turma of turmas || []) {
+    const anterior = resultado.at(-1);
+    const ehLinhaDeCurso = !('inscritosTotal' in (turma || {}))
+      && /^Qualquer\s+Unidade\b/i.test(normalizarTexto(turma?.categoria))
+      && anterior
+      && anterior.codigo === turma.codigo
+      && REGEX_TIPO_VAGA.test(normalizarTexto(anterior.categoria))
+      && Number(turma.total || 0) <= Number(anterior.total || 0);
+    if (!ehLinhaDeCurso) {
+      resultado.push(turma);
+      continue;
+    }
+    const nome = normalizarTexto(turma.categoria);
+    const cursos = Array.isArray(anterior.cursos) ? [...anterior.cursos] : [];
+    if (!cursos.some((curso) => normalizarTexto(curso.nome).toLowerCase() === nome.toLowerCase())) {
+      cursos.push({
+        nome,
+        vagas: Number(turma.total || 0),
+        inscritos: Number(turma.inscritos || 0),
+        pendentes: Number(turma.pendentes || 0),
+        matriculados: Number(turma.matriculados || 0)
+      });
+    }
+    resultado[resultado.length - 1] = { ...anterior, cursos };
+  }
+  return resultado;
 }
 
 function ordenarDisciplinas(disciplinas) {
@@ -2344,7 +2509,7 @@ function expandirHistorico(segmentos, inicio, fim) {
       serie.push({ data, ofertada: null, inscritos: null, pendentes: null, matriculados: null, pessoas: null });
       continue;
     }
-    const norm = normalizarContagemTurma(segmento);
+    const norm = normalizarContagemHistorica(segmento);
     serie.push({
       data,
       ofertada: Boolean(segmento.ofertada),
@@ -2415,7 +2580,7 @@ async function montarResposta(dados, estado, env, semestreSolicitado = null) {
   // inscritos duplicados, sem esperar a próxima varredura completa do cron.
   const disciplinas = base.map((disciplina) => ({
     ...disciplina,
-    turmas: (disciplina.turmas || []).map(normalizarTurmaParaResposta)
+    turmas: corrigirRegistrosDeVagasLegados(disciplina.turmas || []).map(normalizarTurmaParaResposta)
   }));
   ordenarDisciplinas(disciplinas);
   return {
