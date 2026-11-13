@@ -1049,6 +1049,7 @@ function extrairTurmas(texto, textoEstruturado = '', html = '') {
   const professoresPorLinks = extrairProfessoresPorTurmaComLinks(html);
   const professoresHtml = extrairProfessoresPorTurmaDoHtml(html);
   const professoresEstruturados = extrairProfessoresPorTurma(textoEstruturado);
+  const cursosPorTurma = extrairCursosDasVagasPorTurma(textoEstruturado);
   const turmas = [];
   const vistas = new Set();
 
@@ -1073,6 +1074,7 @@ function extrairTurmas(texto, textoEstruturado = '', html = '') {
     const periodoTurma = extrairPeriodoDaTurma(antesDasVagas);
     const semestre = identificarSemestreDaTurma(codigo, periodoTurma.inicio);
 
+    const cursosDaTurma = cursosPorTurma.get(codigo) || new Map();
     for (const categoria of extrairCategorias(bloco.slice(posicaoVagas))) {
       const ocupadas = categoria.inscritos + categoria.pendentes + categoria.matriculados;
       const chave = [codigo, categoria.nome, categoria.vagas, categoria.inscritos, categoria.pendentes, categoria.matriculados].join('|');
@@ -1091,6 +1093,7 @@ function extrairTurmas(texto, textoEstruturado = '', html = '') {
         professores,
         dia: extrairDias(horario),
         categoria: categoria.nome,
+        cursos: cursosDaTurma.get(chaveCategoriaVaga(categoria.nome)) || [],
         total: categoria.vagas,
         ocupadas,
         disponiveis: Math.max(0, categoria.vagas - ocupadas),
@@ -1453,6 +1456,67 @@ function normalizarProfessores(nomes) {
 function extrairDias(horario) {
   const dias = Array.from(String(horario).matchAll(/\b(seg|ter|qua|qui|sex|s[aá]b|dom)\b/gi), (item) => item[1].toLowerCase());
   return dias.length ? [...new Set(dias)].join(' / ') : '—';
+}
+
+/**
+ * Abaixo de cada tipo de vaga ("Obrigatória", "Optativa Livre"…) o Júpiter
+ * lista para quem as vagas estão reservadas, uma linha por curso/unidade:
+ *   Obrigatória                                   60 40 0 30
+ *     Escola Politécnica - Engenharia Naval       50 35 0 25
+ * Aqui só anotamos esse detalhe em cada tipo de vaga. Os totais continuam
+ * vindo exclusivamente das linhas de tipo (extrairCategorias), então uma
+ * página sem essas linhas — ou com um layout diferente — não altera a contagem.
+ */
+const REGEX_TIPO_VAGA = /^(Obrigat(?:\S{1,3}|\s)ria|Optativa\s+Eletiva|Optativa\s+Livre|Alunos\s+Especiais|Extracurricular)\b/i;
+
+function chaveCategoriaVaga(nome) {
+  const texto = normalizarTexto(nome).toLowerCase();
+  if (/^obrigat/.test(texto)) return 'obrigatoria';
+  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function extrairCursosDasVagasPorTurma(textoEstruturado) {
+  const estrutura = String(textoEstruturado || '');
+  const marcador = /C(?:[oó]| )digo\s+da\s+Turma\s*:?\s*(?:\u241F\s*)?(\d+)/gi;
+  const ocorrencias = Array.from(estrutura.matchAll(marcador));
+  const resultado = new Map();
+
+  for (let indice = 0; indice < ocorrencias.length; indice += 1) {
+    const codigo = ocorrencias[indice][1];
+    if (resultado.has(codigo)) continue;
+    const inicio = ocorrencias[indice].index || 0;
+    const fim = indice + 1 < ocorrencias.length ? (ocorrencias[indice + 1].index || estrutura.length) : estrutura.length;
+    resultado.set(codigo, extrairCursosDoBlocoDeVagas(estrutura.slice(inicio, fim)));
+  }
+  return resultado;
+}
+
+function extrairCursosDoBlocoDeVagas(bloco) {
+  const porCategoria = new Map();
+  const cabecalho = /Vagas\s*\u241F?\s*Inscritos\s*\u241F?\s*Pendentes\s*\u241F?\s*Matriculados\s*\u241F?/i;
+  const inicioVagas = bloco.search(cabecalho);
+  if (inicioVagas < 0) return porCategoria;
+
+  let categoriaAtual = null;
+  for (const linha of bloco.slice(inicioVagas).replace(cabecalho, '').split('\n')) {
+    const celulas = linha.split('\u241F').map(normalizarTexto).filter(Boolean);
+    if (celulas.length < 5) continue;
+    const numeros = celulas.slice(-4);
+    if (!numeros.every((valor) => /^(?:\d+|-)$/.test(valor))) continue;
+    const nome = normalizarTexto(celulas.slice(0, -4).join(' '));
+    if (!nome || !/[A-Za-zÀ-ÿ]{3}/.test(nome)) continue;
+
+    if (REGEX_TIPO_VAGA.test(nome)) {
+      categoriaAtual = chaveCategoriaVaga(nome);
+      if (!porCategoria.has(categoriaAtual)) porCategoria.set(categoriaAtual, []);
+      continue;
+    }
+    if (!categoriaAtual) continue;
+
+    const [vagas, inscritos, pendentes, matriculados] = numeros.map((valor) => (valor === '-' ? 0 : Number(valor)));
+    porCategoria.get(categoriaAtual).push({ nome, vagas, inscritos, pendentes, matriculados });
+  }
+  return porCategoria;
 }
 
 function extrairCategorias(texto) {

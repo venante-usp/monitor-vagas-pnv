@@ -29,7 +29,11 @@ function paginaTurma(codigo, turmas) {
 <table><tr><td>Horário</td><td></td><td>Prof(a).</td></tr>
 <tr><td>seg</td><td>07:30</td><td>09:10</td><td><a href="#">Fulano de Tal Silva</a></td></tr></table>
 <table><tr><td></td><td>Vagas</td><td>Inscritos</td><td>Pendentes</td><td>Matriculados</td></tr>
-<tr><td>Obrigatória</td><td>60</td><td>40</td><td>0</td><td>30</td></tr></table>`).join('');
+<tr><td>Obrigatória</td><td>60</td><td>40</td><td>0</td><td>30</td></tr>
+<tr><td></td><td>Escola Politécnica - Habilitação em Engenharia Naval</td><td>50</td><td>35</td><td>0</td><td>25</td></tr>
+<tr><td></td><td>Escola Politécnica - Engenharia Mecânica</td><td>10</td><td>5</td><td>0</td><td>5</td></tr>
+<tr><td>Optativa Livre</td><td>5</td><td>2</td><td>0</td><td>1</td></tr>
+<tr><td></td><td>Qualquer Unidade da USP</td><td>5</td><td>2</td><td>0</td><td>1</td></tr></table>`).join('');
   return `<html><body>${'x'.repeat(200)}<div>Disciplina: ${codigo} - Introdução ao Projeto de Engenharia</div>
 <div>Clique para consultar os requisitos</div><div>Lista de Turmas oferecidas</div>${blocos}</body></html>`;
 }
@@ -107,7 +111,19 @@ d = await api();
 
 assert.equal(d.semestrePadrao, '2027-1');
 assert.equal(d.disciplinas[0].turmas[0].inicio, '2027-02-22');
-assert.equal(d.disciplinas[0].turmas[0].semestre, '2027-1'); 
+assert.equal(d.disciplinas[0].turmas[0].semestre, '2027-1');
+// Vagas reservadas por curso, abaixo de cada tipo de vaga.
+const obrigatoria = d.disciplinas[0].turmas.find((t) => /^Obrigat/.test(t.categoria));
+assert.deepEqual(obrigatoria.cursos.map((c) => [c.nome, c.vagas, c.matriculados]), [
+  ['Escola Politécnica - Habilitação em Engenharia Naval', 50, 25],
+  ['Escola Politécnica - Engenharia Mecânica', 10, 5]
+]);
+const livre = d.disciplinas[0].turmas.find((t) => t.categoria === 'Optativa Livre');
+assert.deepEqual(livre.cursos.map((c) => c.nome), ['Qualquer Unidade da USP']);
+// Os totais por tipo de vaga não mudam com a leitura dos cursos.
+assert.equal(obrigatoria.total, 60);
+assert.equal(obrigatoria.matriculados, 30);
+
 let d2 = await api('?semestre=2026-2');
 
 assert.equal(d2.disciplinas.length, 2);
