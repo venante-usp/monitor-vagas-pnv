@@ -146,6 +146,9 @@ const t3100 = turmasDe(d, 'PNV3100')[0];
 assert.equal(t3100.inscritos, 10);
 assert.equal(t3100.ocupadas, 55);
 assert.equal(t3100.disponiveis, 5);
+assert.equal(t3412[1].inscritosTotal, 4, 'total do Júpiter reconstruído: 2 + 1 + 1');
+assert.equal(t3412[1].cursos[0].inscritosTotal, 4);
+assert.equal(t3100.inscritosTotal, 55);
 
 // ---------------------------------------------------------------------------
 // 2) Página nova do Júpiter (formato real) é lida corretamente.
@@ -168,6 +171,9 @@ assert.equal(livre.ocupadas, 3);
 assert.equal(livre.disponiveis, 2);
 assert.deepEqual(obrig.cursos.map((c) => [c.nome, c.vagas]), [['Escola Politécnica - Habilitação em Engenharia Naval', 47]]);
 assert.deepEqual(livre.cursos.map((c) => c.nome), ['Qualquer Unidade da USP']);
+assert.equal(obrig.inscritosTotal, 52);
+assert.equal(livre.inscritosTotal, 3);
+assert.equal(obrig.cursos[0].inscritosTotal, 52);
 
 // ---------------------------------------------------------------------------
 // 3) Histórico: só segmentos anteriores a 20/09/2026 tinham inscritos brutos.

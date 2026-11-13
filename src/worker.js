@@ -1720,6 +1720,16 @@ function normalizarContagemHistorica(segmento) {
   return norm;
 }
 
+// "Inscritos" exatamente como o Júpiter mostra (o total). Registros gravados
+// antes de existir o campo guardam só quem aguarda vaga; o total do Júpiter é
+// esse valor somado a pendentes e matriculados.
+function inscritosTotalDoRegistro(registro) {
+  const total = registro?.inscritosTotal;
+  if (total !== null && total !== undefined && total !== '' && Number.isFinite(Number(total))) return Number(total);
+  const norm = normalizarContagemTurma(registro);
+  return norm.inscritos + norm.pendentes + norm.matriculados;
+}
+
 function normalizarTurmaParaResposta(turma) {
   const norm = normalizarContagemTurma(turma);
   const total = Number(turma?.total ?? turma?.vagas ?? 0) || 0;
@@ -1736,8 +1746,10 @@ function normalizarTurmaParaResposta(turma) {
     ocupadas,
     disponiveis: Math.max(0, total - ocupadas),
     inscritos: norm.inscritos,
+    inscritosTotal: inscritosTotalDoRegistro(turma),
     pendentes: norm.pendentes,
-    matriculados: norm.matriculados
+    matriculados: norm.matriculados,
+    cursos: (turma?.cursos || []).map((curso) => ({ ...curso, inscritosTotal: inscritosTotalDoRegistro(curso) }))
   };
 }
 
