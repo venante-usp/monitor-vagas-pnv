@@ -30,6 +30,12 @@ const SUBSTITUICOES_MANUAIS = Object.freeze({
   // Exemplo: PNV0000: { codigo: 'PNV0001', nome: 'Nome da disciplina sucessora' }
 });
 
+// Aumente quando a leitura das páginas do Júpiter mudar: o primeiro ciclo da
+// nova versão refaz a varredura completa, para que dados gravados pela leitura
+// antiga não fiquem no site até a meia-noite (também sem a chamada pós-deploy).
+// 2: cursos a que cada tipo de vaga está reservado ("EP - para toda a Unidade").
+const VERSAO_LEITURA = 2;
+
 const KEY_DADOS = 'monitor:latest';
 const KEY_ESTADO = 'monitor:state';
 // Histórico V2: dividido por mês para manter dados diários por tempo indeterminado.
@@ -60,7 +66,10 @@ const ANTECEDENCIA_PROXIMO_SEMESTRE_DIAS = 75; // mostra "próximo semestre" ant
 // O monitor prioriza consistência dos dados do Júpiter, não velocidade.
 // Cada execução faz poucas consultas, sempre uma por vez, com pausas.
 const TAMANHO_LOTE_COMPLETO = 5;
+// Atualização curta: até 3 disciplinas ao vivo, em rodízio; o restante do
+// limite vai para siglas da lista oficial que ainda não têm turma viva.
 const TAMANHO_LOTE_CURTO = 3;
+const CONSULTAS_POR_ATUALIZACAO_CURTA = 5;
 const ESPERA_ENTRE_CONSULTAS_MS = 3_000;
 const TIMEOUT_MS = 25_000;
 const MAX_TENTATIVAS_POR_DISCIPLINA = 3;
@@ -114,8 +123,9 @@ async function executarCiclo(env, instante) {
   const hojeBrt = dataBrt(agora);
 
   try {
-    // Primeiro uso, novo dia ou lista ainda não sincronizada: inicia scan completo.
-    if (!estado.full || estado.full.data !== hojeBrt) {
+    // Primeiro uso, novo dia, lista ainda não sincronizada ou leitura nova
+    // publicada: inicia scan completo.
+    if (!estado.full || estado.full.data !== hojeBrt || estado.full.versaoLeitura !== VERSAO_LEITURA) {
       await iniciarScanCompleto(env, dados, estado, hojeBrt, agora);
       return;
     }
@@ -179,6 +189,7 @@ async function prepararScanCompleto(env, dados, estado, catalogoAtivo, hojeBrt, 
 
   estado.full = {
     data: hojeBrt,
+    versaoLeitura: VERSAO_LEITURA,
     emAndamento: true,
     total: codigos.length,
     concluidas: 0,
@@ -303,24 +314,24 @@ function aplicarResultadoNoScan(dados, full, tarefa, resultado, agora = Date.now
 }
 
 async function executarAtualizacaoCurta(env, dados, estado, agora) {
-  let codigos = (dados.disciplinas || []).map((disciplina) => disciplina.codigo);
-  if (!codigos.length) {
-    // Entre semestres nada está ofertado. Em vez de ficar parado até a
-    // meia-noite, a atualização curta percorre a lista oficial inteira para
-    // abrir o próximo semestre assim que a primeira turma for cadastrada.
-    codigos = Array.isArray(estado.full?.codigos) ? [...estado.full.codigos] : [];
-  }
-  if (!codigos.length) {
+  const aoVivo = (dados.disciplinas || []).map((disciplina) => disciplina.codigo);
+  // Também procura turmas novas nas siglas da lista oficial sem turma viva.
+  // No cadastro do semestre a coordenação publica as disciplinas aos poucos:
+  // antes, quem fosse publicada depois da varredura da meia-noite só aparecia
+  // no dia seguinte. Entre semestres (nada ao vivo) a procura usa o limite
+  // inteiro e abre o próximo semestre assim que a primeira turma aparecer.
+  const conjuntoAoVivo = new Set(aoVivo);
+  const listaOficial = Array.isArray(estado.full?.codigos) ? estado.full.codigos : [];
+  const semTurmaViva = listaOficial.filter((codigo) => !conjuntoAoVivo.has(codigo));
+
+  const loteAoVivo = proximasDoRodizio(aoVivo, estado.ultimaAoVivo, TAMANHO_LOTE_CURTO);
+  const loteProcura = proximasDoRodizio(semTurmaViva, estado.ultimaProcurada, CONSULTAS_POR_ATUALIZACAO_CURTA - loteAoVivo.length);
+  const lote = [...loteAoVivo, ...loteProcura];
+  if (!lote.length) {
     // Não há nada para atualizar: no próximo ciclo o scan diário será refeito se necessário.
     dados.ultimaAtualizacao = agora;
     await salvarDados(env, dados);
     return;
-  }
-
-  const cursor = Number(estado.cursorCurto || 0) % codigos.length;
-  const lote = [];
-  for (let indice = 0; indice < Math.min(TAMANHO_LOTE_CURTO, codigos.length); indice += 1) {
-    lote.push(codigos[(cursor + indice) % codigos.length]);
   }
 
   const resultados = await consultarLote(lote);
@@ -335,12 +346,26 @@ async function executarAtualizacaoCurta(env, dados, estado, agora) {
     }
   }
 
-  estado.cursorCurto = (cursor + lote.length) % Math.max(1, codigos.length);
+  if (loteAoVivo.length) estado.ultimaAoVivo = loteAoVivo.at(-1);
+  if (loteProcura.length) estado.ultimaProcurada = loteProcura.at(-1);
+  delete estado.cursorCurto; // posição usada pela versão anterior
   dados.ultimaAtualizacaoCurta = agora;
   dados.ultimaAtualizacao = agora;
   dados.ultimoErro = falhas ? { em: agora, mensagem: `${falhas} disciplina(s) mantiveram os dados anteriores nesta atualização curta.` } : null;
   ordenarDisciplinas(dados.disciplinas);
   await Promise.all([salvarDados(env, dados), salvarEstado(env, estado)]);
+}
+
+// Próximas `quantidade` siglas depois de `ultima`, em ordem e voltando ao
+// começo. Guardar a última sigla consultada (e não uma posição na lista)
+// mantém o rodízio estável quando a lista muda entre um ciclo e outro.
+function proximasDoRodizio(lista, ultima, quantidade) {
+  const ordenada = [...new Set(lista || [])].sort();
+  const total = Math.min(Math.max(0, quantidade), ordenada.length);
+  if (!total) return [];
+  const depois = ordenada.findIndex((codigo) => codigo > String(ultima || ''));
+  const inicio = depois < 0 ? 0 : depois;
+  return Array.from({ length: total }, (_, indice) => ordenada[(inicio + indice) % ordenada.length]);
 }
 
 async function buscarCatalogoAtual() {
@@ -978,15 +1003,19 @@ function decodificarEntidadesHtml(valor) {
 }
 
 function textoEstruturadoDaPagina(html) {
-  // Mantém separadores de células (␟) e linhas para recuperar os docentes,
-  // que o Júpiter coloca em coluna separada do horário. O parser legado usa
-  // a versão achatada abaixo, portanto isso não altera a leitura de vagas.
+  // Uma linha por <tr> da página, com as células separadas por ␟. Serve para
+  // os docentes (coluna separada do horário) e para os cursos abaixo de cada
+  // tipo de vaga ("EP - para toda a Unidade"); os totais de cada tipo vêm da
+  // versão achatada. As quebras de linha do código-fonte (o Júpiter põe uma
+  // entre cada <td>) viram espaço antes: sem isso cada célula caía numa linha
+  // própria e as linhas de curso nunca eram lidas.
   const bruto = decodificarEntidadesHtml(
     String(html || '')
       .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
       .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
       .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
       .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, ' ')
+      .replace(/\s+/g, ' ')
       .replace(/<br\s*\/?\s*>/gi, '\n')
       .replace(/<\/tr\s*>/gi, '\n')
       .replace(/<\/(?:td|th)\s*>/gi, '\u241F')
@@ -2643,7 +2672,7 @@ async function lerDados(env) {
 }
 
 async function lerEstado(env) {
-  return (await lerJson(env, KEY_ESTADO)) || { full: null, cursorCurto: 0 };
+  return (await lerJson(env, KEY_ESTADO)) || { full: null };
 }
 
 async function lerJson(env, chave) {
