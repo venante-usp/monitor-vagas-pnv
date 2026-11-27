@@ -30,6 +30,12 @@ const SUBSTITUICOES_MANUAIS = Object.freeze({
   // Exemplo: PNV0000: { codigo: 'PNV0001', nome: 'Nome da disciplina sucessora' }
 });
 
+// Aumente quando a leitura das páginas do Júpiter mudar: o primeiro ciclo da
+// nova versão refaz a varredura completa, para que dados gravados pela leitura
+// antiga não fiquem no site até a meia-noite (também sem a chamada pós-deploy).
+// 2: cursos a que cada tipo de vaga está reservado ("EP - para toda a Unidade").
+const VERSAO_LEITURA = 2;
+
 const KEY_DADOS = 'monitor:latest';
 const KEY_ESTADO = 'monitor:state';
 // Histórico V2: dividido por mês para manter dados diários por tempo indeterminado.
@@ -117,8 +123,9 @@ async function executarCiclo(env, instante) {
   const hojeBrt = dataBrt(agora);
 
   try {
-    // Primeiro uso, novo dia ou lista ainda não sincronizada: inicia scan completo.
-    if (!estado.full || estado.full.data !== hojeBrt) {
+    // Primeiro uso, novo dia, lista ainda não sincronizada ou leitura nova
+    // publicada: inicia scan completo.
+    if (!estado.full || estado.full.data !== hojeBrt || estado.full.versaoLeitura !== VERSAO_LEITURA) {
       await iniciarScanCompleto(env, dados, estado, hojeBrt, agora);
       return;
     }
@@ -182,6 +189,7 @@ async function prepararScanCompleto(env, dados, estado, catalogoAtivo, hojeBrt, 
 
   estado.full = {
     data: hojeBrt,
+    versaoLeitura: VERSAO_LEITURA,
     emAndamento: true,
     total: codigos.length,
     concluidas: 0,

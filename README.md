@@ -7,6 +7,7 @@ Monitor automático de disciplinas PNV: o navegador apenas lê os dados do KV. S
 - A cada 5 minutos: atualização curta com até 5 consultas — até 3 disciplinas já ofertadas, em rodízio, e o restante para siglas da lista oficial que ainda não têm turma. Assim, uma disciplina cadastrada no Júpiter durante o dia aparece no site em até ~2 horas, sem esperar a meia-noite.
 - À 00:00 de Brasília: começa a varredura completa da lista oficial PNV do Júpiter; cada execução processa até 5 códigos em ritmo lento e com tentativas.
 - Depois de cada deploy: a publicação consulta imediatamente a lista oficial do Júpiter e cria uma nova fila de varredura completa. O primeiro lote é processado pelo próximo cron de 5 minutos.
+- Quando a leitura das páginas do Júpiter muda (constante `VERSAO_LEITURA` em `src/worker.js`), o primeiro cron depois do deploy refaz a varredura completa, mesmo sem a chamada pós-deploy. Aumente esse número sempre que mudar a leitura.
 
 Nenhum visitante consegue disparar atualização.
 
