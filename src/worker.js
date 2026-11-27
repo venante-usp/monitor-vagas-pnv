@@ -978,15 +978,19 @@ function decodificarEntidadesHtml(valor) {
 }
 
 function textoEstruturadoDaPagina(html) {
-  // Mantém separadores de células (␟) e linhas para recuperar os docentes,
-  // que o Júpiter coloca em coluna separada do horário. O parser legado usa
-  // a versão achatada abaixo, portanto isso não altera a leitura de vagas.
+  // Uma linha por <tr> da página, com as células separadas por ␟. Serve para
+  // os docentes (coluna separada do horário) e para os cursos abaixo de cada
+  // tipo de vaga ("EP - para toda a Unidade"); os totais de cada tipo vêm da
+  // versão achatada. As quebras de linha do código-fonte (o Júpiter põe uma
+  // entre cada <td>) viram espaço antes: sem isso cada célula caía numa linha
+  // própria e as linhas de curso nunca eram lidas.
   const bruto = decodificarEntidadesHtml(
     String(html || '')
       .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
       .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
       .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
       .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, ' ')
+      .replace(/\s+/g, ' ')
       .replace(/<br\s*\/?\s*>/gi, '\n')
       .replace(/<\/tr\s*>/gi, '\n')
       .replace(/<\/(?:td|th)\s*>/gi, '\u241F')
