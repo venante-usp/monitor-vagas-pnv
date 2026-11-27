@@ -4,9 +4,9 @@ Monitor automático de disciplinas PNV: o navegador apenas lê os dados do KV. S
 
 ## Atualização automática
 
-- A cada 5 minutos: atualização 1curta de até 3 disciplinas já ofertadas.
+- A cada 5 minutos: atualização curta com até 5 consultas — até 3 disciplinas já ofertadas, em rodízio, e o restante para siglas da lista oficial que ainda não têm turma. Assim, uma disciplina cadastrada no Júpiter durante o dia aparece no site em até ~2 horas, sem esperar a meia-noite.
 - À 00:00 de Brasília: começa a varredura completa da lista oficial PNV do Júpiter; cada execução processa até 5 códigos em ritmo lento e com tentativas.
-- Depois de cada deploy: a publicação consulta imediatamente a lis6ta oficial do Júpiter e c6ria uma nova fila de varredura completa. O primeiro lote é processado pelo próximo cron de 5 minutos.
+- Depois de cada deploy: a publicação consulta imediatamente a lista oficial do Júpiter e cria uma nova fila de varredura completa. O primeiro lote é processado pelo próximo cron de 5 minutos.
 
 Nenhum visitante consegue disparar atualização.
 
@@ -18,7 +18,7 @@ O site separa as turmas por semestre e cuida sozinho da troca de semestre — n�
 |---|---|
 | **Ao vivo** | A disciplina aparece no Júpiter e é atualizada pelo cron. |
 | **Congelado** | O Júpiter passou a responder *"Não existe oferecimento para a sigla…"* (o que acontece antes do fim do semestre). O último retrato confirmado continua visível, marcado como congelado. |
-| **Aguardando cadastro** | O próximo semestre aparece como aba vazia ~75 dias antes do fim do atual. Enquanto nenhuma turma estiver viva, a atualização curta percorre a lista oficial inteira (3 siglas a cada 5 min) para detectar a primeira turma nova. |
+| **Aguardando cadastro** | O próximo semestre aparece como aba vazia ~75 dias antes do fim do atual. Enquanto nenhuma turma estiver viva, a atualização curta percorre a lista oficial inteira (5 siglas a cada 5 min) para detectar a primeira turma nova. |
 | **Arquivado** | 14 dias depois do *Fim* das turmas (ou 60 dias, se o Júpiter nunca retirar a oferta) o semestre é gravado em `monitor:semestre:arquivo:v1:AAAA-S` no KV e sai das abas, ficando no seletor **Arquivo**. |
 
 O semestre de cada turma vem das datas **Início/Fim** que o Júpiter publica em cada turma (com o código da turma `AAAAS##` como alternativa). Por isso turmas do semestre corrente e do seguinte nunca se misturam, mesmo quando aparecem ao mesmo tempo. Sem datas, usa-se o calendário (1º: fev–jul, 2º: ago–dez).
