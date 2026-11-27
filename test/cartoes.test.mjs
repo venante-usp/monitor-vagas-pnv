@@ -13,12 +13,14 @@ vm.runInContext(fs.readFileSync(new URL('../public/cartoes.js', import.meta.url)
 // compará-las com deepEqual estrito.
 const plain = (valor) => JSON.parse(JSON.stringify(valor));
 
-assert.equal(ctx.formatarEncontros('seg 08:20 10:10 qua 10:00 11:40 qua 14:00 15:40'), 'seg 08:20–10:10 · qua 10:00–11:40 · qua 14:00–15:40');
-assert.equal(ctx.formatarEncontros('sáb 08:00 12:00'), 'sáb 08:00–12:00');
+assert.equal(ctx.formatarEncontros('seg 08:20 10:10 qua 10:00 11:40 qua 14:00 15:40'), 'seg 08:20-10:10 · qua 10:00-11:40 · qua 14:00-15:40');
+assert.equal(ctx.formatarEncontros('sáb 08:00 12:00'), 'sáb 08:00-12:00');
 assert.equal(ctx.formatarEncontros('Horário não informado'), 'Horário não informado');
 assert.equal(ctx.formatarEncontros(''), 'Horário não informado');
 
 assert.equal(ctx.nomeSemCodigo('PNV3412 - Sistemas Oceânicos', 'PNV3412'), 'Sistemas Oceânicos');
+assert.equal(ctx.nomeSemCodigo('PNV3412 \u2014 Sistemas Oceânicos', 'PNV3412'), 'Sistemas Oceânicos');
+assert.equal(ctx.nomeSemCodigo('PNV3412 \u2013 Sistemas Oceânicos', 'PNV3412'), 'Sistemas Oceânicos');
 assert.equal(ctx.nomeSemCodigo('Sistemas Oceânicos', 'PNV3412'), 'Sistemas Oceânicos');
 assert.equal(ctx.nomeSemCodigo('Disciplina PNV3412', 'PNV3412'), '');
 assert.equal(ctx.nomeSemCodigo('PNV3412', 'PNV3412'), '');

@@ -1,10 +1,10 @@
-# Monitor de vagas PNV — Cloudflare Free
+# Monitor de vagas PNV - Cloudflare Free
 
 Monitor automático de disciplinas PNV: o navegador apenas lê os dados do KV. Somente o cron da Cloudflare e o processo de deploy podem consultar o Júpiter.
 
 ## Atualização automática
 
-- A cada 5 minutos: atualização curta com até 5 consultas — até 3 disciplinas já ofertadas, em rodízio, e o restante para siglas da lista oficial que ainda não têm turma. Assim, uma disciplina cadastrada no Júpiter durante o dia aparece no site em até ~2 horas, sem esperar a meia-noite.
+- A cada 5 minutos: atualização curta com até 5 consultas: até 3 disciplinas já ofertadas, em rodízio, e o restante para siglas da lista oficial que ainda não têm turma. Assim, uma disciplina cadastrada no Júpiter durante o dia aparece no site em até ~2 horas, sem esperar a meia-noite.
 - À 00:00 de Brasília: começa a varredura completa da lista oficial PNV do Júpiter; cada execução processa até 5 códigos em ritmo lento e com tentativas.
 - Depois de cada deploy: a publicação consulta imediatamente a lista oficial do Júpiter e cria uma nova fila de varredura completa. O primeiro lote é processado pelo próximo cron de 5 minutos.
 - Quando a leitura das páginas do Júpiter muda (constante `VERSAO_LEITURA` em `src/worker.js`), o primeiro cron depois do deploy refaz a varredura completa, mesmo sem a chamada pós-deploy. Aumente esse número sempre que mudar a leitura.
@@ -13,7 +13,7 @@ Nenhum visitante consegue disparar atualização.
 
 ## Ciclo semestral automático
 
-O site separa as turmas por semestre e cuida sozinho da troca de semestre — não há nada para configurar a cada período.
+O site separa as turmas por semestre e cuida sozinho da troca de semestre: não há nada para configurar a cada período.
 
 | Situação | O que acontece |
 |---|---|
@@ -22,7 +22,7 @@ O site separa as turmas por semestre e cuida sozinho da troca de semestre — n�
 | **Aguardando cadastro** | O próximo semestre aparece como aba vazia ~75 dias antes do fim do atual. Enquanto nenhuma turma estiver viva, a atualização curta percorre a lista oficial inteira (5 siglas a cada 5 min) para detectar a primeira turma nova. |
 | **Arquivado** | 14 dias depois do *Fim* das turmas (ou 60 dias, se o Júpiter nunca retirar a oferta) o semestre é gravado em `monitor:semestre:arquivo:v1:AAAA-S` no KV e sai das abas, ficando no seletor **Arquivo**. |
 
-O semestre de cada turma vem das datas **Início/Fim** que o Júpiter publica em cada turma (com o código da turma `AAAAS##` como alternativa). Por isso turmas do semestre corrente e do seguinte nunca se misturam, mesmo quando aparecem ao mesmo tempo. Sem datas, usa-se o calendário (1º: fev–jul, 2º: ago–dez).
+O semestre de cada turma vem das datas **Início/Fim** que o Júpiter publica em cada turma (com o código da turma `AAAAS##` como alternativa). Por isso turmas do semestre corrente e do seguinte nunca se misturam, mesmo quando aparecem ao mesmo tempo. Sem datas, usa-se o calendário (1º: fev-jul, 2º: ago-dez).
 
 Por padrão o site abre no semestre mais novo com turmas vivas (ex.: período de matrícula); se não houver, no semestre em andamento. Qualquer semestre pode ser aberto por link: `/?semestre=2026-2`.
 
@@ -31,8 +31,8 @@ A API aceita o mesmo parâmetro: `GET /api/monitor?semestre=AAAA-S` e devolve ta
 Para conferir o ciclo localmente, sem rede: `npm test`.
 
 ## Configuração adicional obrigatória para a sincronização pós-deploy
-4
-O deploy executa `wrangler deploy` e, logo depois, cha3ma uma rota administrativa protegida. Você pre4cisa configurar o mesmo segredo em dois lugares.
+
+O deploy executa `wrangler deploy` e, logo depois, chama uma rota administrativa protegida. Você precisa configurar o mesmo segredo em dois lugares.
 
 ### 1. Segredo de execução do Worker
 
