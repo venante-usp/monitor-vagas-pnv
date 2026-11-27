@@ -34,6 +34,12 @@ function nomeSemCodigo(nome, codigo) {
   return texto.replace(new RegExp(`^${escapado}\\s*[-\u2013\u2014·:]?\\s*`, 'i'), '').trim();
 }
 
+// "PNV1100 - Introdução ao Projeto de Engenharia"; sem nome no Júpiter, só a sigla.
+function rotuloDisciplina(codigo, nome) {
+  const resto = nomeSemCodigo(nome, codigo);
+  return resto ? `${codigo} - ${resto}` : String(codigo || '');
+}
+
 // "Inscritos" como o Júpiter mostra (o total). Sem o campo, reconstrói a
 // partir de quem aguarda vaga + pendentes + matriculados.
 function inscritosDoJupiter(registro) {

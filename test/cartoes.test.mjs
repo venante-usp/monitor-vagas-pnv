@@ -25,6 +25,11 @@ assert.equal(ctx.nomeSemCodigo('Sistemas Oceânicos', 'PNV3412'), 'Sistemas Oce�
 assert.equal(ctx.nomeSemCodigo('Disciplina PNV3412', 'PNV3412'), '');
 assert.equal(ctx.nomeSemCodigo('PNV3412', 'PNV3412'), '');
 
+// Seletor do Histórico: o nome do catálogo já começa com a sigla.
+assert.equal(ctx.rotuloDisciplina('PNV1100', 'PNV1100 - Introdução ao Projeto de Engenharia'), 'PNV1100 - Introdução ao Projeto de Engenharia');
+assert.equal(ctx.rotuloDisciplina('PNV1120', 'PNV1120'), 'PNV1120');
+assert.equal(ctx.rotuloDisciplina('PNV1120', 'Disciplina PNV1120'), 'PNV1120');
+
 assert.equal(ctx.inscritosDoJupiter({ inscritosTotal: 52, inscritos: 12, pendentes: 0, matriculados: 40 }), 52);
 assert.equal(ctx.inscritosDoJupiter({ inscritos: 2, pendentes: 1, matriculados: 1 }), 4);
 

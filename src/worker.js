@@ -464,7 +464,7 @@ function sincronizarCompartimentoDesativadas(dados, catalogo, hojeBrt, agora) {
     });
 
     // Não é apenas “sem turma”: como existe desativação administrativa, a
-    // disciplina não deve voltar ao monitor de vagas ou à grade horária.
+    // disciplina não deve voltar ao monitor de vagas.
     removerDisciplina(dados.disciplinas || [], item.codigo);
   }
 

@@ -18,11 +18,16 @@ for (const resto of ['data-view="grade"', 'gradeView', 'Grade horária', 'printD
 }
 
 // Todo texto do site usa "-" no lugar de travessão (— e –), inclusive o que o
-// JavaScript monta, como os horários "seg 11:10-12:50".
+// JavaScript monta, como os horários "seg 11:10-12:50". O travessão também
+// chegaria à tela escrito como escape (—) ou entidade (&mdash;); escapes só
+// aparecem nas classes das expressões que leem o Júpiter, que começam por
+// hífen: [-–—·:].
+const CLASSE_DE_LEITURA = /\[-(?:\\u201[34])+[^\]\n]*\]/g;
+const TRAVESSAO_ESCRITO = /\\u201[34]|\\u\{201[34]\}|&[mn]dash;|&#821[12];|&#x201[34];/i;
 const comTravessao = [];
 for (const arquivo of fs.readdirSync(PUBLICO)) {
   ler(arquivo).split('\n').forEach((linha, indice) => {
-    if (/[–—]/.test(linha)) comTravessao.push(`public/${arquivo}:${indice + 1}`);
+    if (/[–—]/.test(linha) || TRAVESSAO_ESCRITO.test(linha.replace(CLASSE_DE_LEITURA, ''))) comTravessao.push(`public/${arquivo}:${indice + 1}`);
   });
 }
 assert.deepEqual(comTravessao, [], `travessão em ${comTravessao.join(', ')}`);
