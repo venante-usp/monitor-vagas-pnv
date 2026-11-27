@@ -11,10 +11,10 @@ function compararCodigos(a, b) {
   return String(a ?? '').localeCompare(String(b ?? ''), 'pt-BR', { numeric: true });
 }
 
-// "seg 08:20 10:10 qua 10:00 11:40" -> ["seg 08:20–10:10", "qua 10:00–11:40"]
+// "seg 08:20 10:10 qua 10:00 11:40" -> ["seg 08:20-10:10", "qua 10:00-11:40"]
 function encontrosDoHorario(horario) {
   const regex = /\b(seg|ter|qua|qui|sex|s[aá]b|dom)\s+(\d{1,2}:\d{2})\s+(\d{1,2}:\d{2})/gi;
-  return Array.from(String(horario || '').matchAll(regex), (achado) => `${achado[1].toLowerCase()} ${achado[2]}–${achado[3]}`);
+  return Array.from(String(horario || '').matchAll(regex), (achado) => `${achado[1].toLowerCase()} ${achado[2]}-${achado[3]}`);
 }
 
 function formatarEncontros(horario) {
@@ -31,7 +31,13 @@ function nomeSemCodigo(nome, codigo) {
   if (!texto || !cod) return texto;
   const escapado = cod.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   if (new RegExp(`^Disciplina\\s+${escapado}$`, 'i').test(texto)) return '';
-  return texto.replace(new RegExp(`^${escapado}\\s*[-–—·:]?\\s*`, 'i'), '').trim();
+  return texto.replace(new RegExp(`^${escapado}\\s*[-\u2013\u2014·:]?\\s*`, 'i'), '').trim();
+}
+
+// "PNV1100 - Introdução ao Projeto de Engenharia"; sem nome no Júpiter, só a sigla.
+function rotuloDisciplina(codigo, nome) {
+  const resto = nomeSemCodigo(nome, codigo);
+  return resto ? `${codigo} - ${resto}` : String(codigo || '');
 }
 
 // "Inscritos" como o Júpiter mostra (o total). Sem o campo, reconstrói a

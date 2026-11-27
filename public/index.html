@@ -22,47 +22,8 @@
     .course-title-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px}.course-title{min-width:0;overflow-wrap:anywhere}.turmas{padding:2px 10px 8px}.turma{padding:12px 0;border-bottom:1px solid #edf1f7}.turma:last-child{border-bottom:0}.turma-head{font-size:12.5px;font-weight:750;color:var(--ink)}.turma-horario{font-size:12px;color:#3d4c64;margin-top:3px}
     .vagas-scroll{overflow-x:auto;margin-top:9px;border:1px solid #e6ebf3;border-radius:10px}.vagas-tabela{width:100%;border-collapse:collapse;font-size:12px}.vagas-tabela th,.vagas-tabela td{padding:5px;border-bottom:1px solid #edf1f7;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.vagas-tabela thead th{background:#f6f8fc;color:var(--muted);font-size:10.5px;font-weight:750;letter-spacing:.03em}.vagas-tabela thead th:first-child,.vagas-tabela tbody th{text-align:left}.vagas-tabela tbody th{font-weight:700;color:var(--ink);white-space:normal}.vagas-tabela tbody tr:last-child th,.vagas-tabela tbody tr:last-child td{border-bottom:0}.vaga-curso th{padding-left:12px;font-weight:500;color:#52627a}.vaga-curso td{color:#52627a}.livres{font-weight:800}.livres.ok{color:var(--ok)}.livres.warn{color:var(--warn)}.livres.bad{color:var(--bad)}
 
-    /* Grade horária simplificada */
-    .timetable{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 6px 17px rgba(20,38,77,.045);overflow:hidden}.timetable-top{padding:19px 20px;border-bottom:1px solid var(--line)}.timetable-title{font-size:17px;font-weight:820;letter-spacing:-.02em}.timetable-sub{margin-top:3px;color:var(--muted);font-size:12px}.timetable-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}.timetable-pill{padding:6px 9px;border:1px solid #dce5f2;border-radius:999px;background:#f7f9fd;color:#62718a;font-size:11px;font-weight:750}.timetable-scroll{overflow:auto;background:#fff;max-height:min(760px,calc(100vh - 205px));scrollbar-color:#aab6c8 #f4f7fb}.simple-timetable{width:100%;min-width:880px;border-collapse:separate;border-spacing:0;table-layout:fixed}.simple-timetable th,.simple-timetable td{border-right:1px solid var(--line);border-bottom:1px solid var(--line)}.simple-timetable th:last-child,.simple-timetable td:last-child{border-right:0}.simple-timetable thead th{position:sticky;top:0;z-index:4;height:45px;padding:0 13px;background:#f8faff;color:#718096;text-align:left;font-size:10px;font-weight:850;letter-spacing:.10em}.simple-timetable .time-head{width:112px;text-align:right;left:0;z-index:6;border-right:1px solid var(--line)}.simple-timetable .time-cell{position:sticky;left:0;z-index:3;width:112px;padding:13px 12px;background:#fbfcfe;color:#61718a;text-align:right;vertical-align:top;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}.simple-timetable .slot-cell{padding:7px;vertical-align:top;background:#fff}.simple-timetable .slot-cell.empty-slot{background:#fdfefe}.slot-stack{display:flex;flex-direction:column;gap:4px;min-height:34px}.slot-course{padding:6px 7px;border:1px solid #c8d6f5;border-left:3px solid #3d67d5;border-radius:7px;background:#f1f5ff;color:#173574;min-width:0;line-height:1.2}.slot-code{display:block;font-size:12px;font-weight:850;letter-spacing:.01em}.slot-turma{font-size:10px;font-weight:780;color:#49649d;white-space:nowrap}.slot-course.multi-course{background:#f7f9fd;border-color:#d8e1f1}.slot-course.multi-course .slot-code{color:#263f78}.slot-course.multi-course .slot-turma{color:#566986}.timetable-empty{padding:58px 18px;text-align:center;color:var(--muted)}.timetable-noschedule{margin:0 20px 18px;padding:10px 12px;border:1px dashed #cbd6e6;border-radius:10px;background:#fbfcfe;color:#77869c;font-size:11px}
-    @media(max-width:850px){.timetable-top{padding:17px}.timetable-noschedule{margin:0 16px 16px}.timetable-scroll{max-height:calc(100vh - 160px)}.simple-timetable{min-width:760px}.simple-timetable .time-head,.simple-timetable .time-cell{width:98px}.simple-timetable thead th{padding:0 10px}.simple-timetable .slot-cell{padding:6px}}
-  
-
-    /* Impressão da grade — modelo institucional */
-    .deactivated{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 6px 17px rgba(20,38,77,.045);overflow:hidden}.deactivated-top{padding:19px 20px;border-bottom:1px solid var(--line)}.deactivated-title{font-size:17px;font-weight:820;letter-spacing:-.02em}.deactivated-sub{margin-top:3px;color:var(--muted);font-size:12px}.deactivated-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(305px,1fr));gap:14px;padding:16px}.deactivated-card{border:1px solid #ead8d2;border-radius:14px;padding:15px;background:linear-gradient(180deg,#fffaf8,#fff)}.deactivated-code{font-size:16px;font-weight:850;color:#8c3d22}.deactivated-name{margin-top:3px;color:#536176;font-size:12px;min-height:32px}.deactivated-badge{display:inline-flex;margin-top:11px;padding:4px 7px;border-radius:999px;background:#fff0ea;color:#9f3e1b;font-size:10px;font-weight:850;letter-spacing:.05em;text-transform:uppercase}.deactivated-dates{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px}.deactivated-date{padding:8px;border:1px solid #f0e2dd;border-radius:9px;background:#fff}.deactivated-date span{display:block;font-size:9px;color:#9a756b;font-weight:850;letter-spacing:.07em}.deactivated-date strong{display:block;margin-top:2px;font-size:12px;color:#5b3427}.deactivated-detail{margin-top:11px;color:#74645e;font-size:11px}.deactivated-link{display:inline-block;margin-top:10px;color:#315dcc;font-size:11px;font-weight:750;text-decoration:none}.deactivated-link:hover{text-decoration:underline}.deactivated-empty{padding:54px 18px;text-align:center;color:var(--muted)}.timetable-title-row{display:flex;gap:14px;justify-content:space-between;align-items:flex-start}.grade-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}.print-action,.docx-action{appearance:none;border-radius:10px;padding:8px 11px;font:800 12px/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;cursor:pointer;white-space:nowrap}.print-action{border:1px solid #b9c9ee;background:#edf2ff;color:#214aab}.print-action:hover{background:#dfe9ff}.docx-action{border:1px solid #132c63;background:#132c63;color:#fff;box-shadow:0 3px 8px rgba(19,44,99,.15)}.docx-action:hover{background:#1d438f}.print-document{display:none}.docx-dialog{width:min(520px,calc(100% - 28px));border:0;border-radius:18px;padding:0;background:transparent;color:var(--ink);box-shadow:0 24px 70px rgba(19,44,99,.28)}.docx-dialog::backdrop{background:rgba(10,24,52,.46);backdrop-filter:blur(2px)}.docx-dialog-card{padding:22px;background:#fff;border:1px solid #dbe4f4;border-radius:18px}.docx-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding-bottom:16px;border-bottom:1px solid #e7edf6}.docx-dialog-eyebrow{font-size:10px;font-weight:850;letter-spacing:.11em;color:#536fae}.docx-dialog h2{margin:4px 0 4px;font-size:20px;letter-spacing:-.03em}.docx-dialog p{margin:0;color:#6a7891;font-size:12px}.dialog-close{appearance:none;border:0;background:transparent;color:#66748b;font-size:28px;line-height:1;cursor:pointer;padding:0 2px}.docx-field{display:flex;flex-direction:column;gap:6px;margin-top:15px}.docx-field span{font-size:10px;font-weight:850;letter-spacing:.09em;color:#75829a}.docx-field input{height:40px;border:1px solid #ccd8ec;border-radius:10px;background:#fbfcff;color:#17223c;padding:0 11px;font:650 13px system-ui,-apple-system,"Segoe UI",Arial,sans-serif}.docx-field input:focus{outline:3px solid rgba(61,103,213,.17);border-color:#6282dd}.docx-dialog-note{margin-top:14px;padding:10px 11px;border:1px solid #dae5f8;border-radius:10px;background:#f5f8ff;color:#5b6f91;font-size:11px;line-height:1.35}.docx-dialog-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}.dialog-cancel,.docx-submit{appearance:none;border-radius:10px;padding:9px 13px;font:800 12px/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;cursor:pointer}.dialog-cancel{border:1px solid #d8e1ef;background:#fff;color:#58687f}.docx-submit{border:1px solid #132c63;background:#132c63;color:#fff}.docx-submit:disabled{opacity:.65;cursor:wait}
-    @media(max-width:600px){.timetable-title-row{flex-direction:column}.grade-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.print-action,.docx-action{width:100%;min-height:38px}}
-    @media print{
-      @page{size:A4 landscape;margin:8mm}
-      html,body{width:auto!important;min-width:0!important;height:auto!important;margin:0!important;padding:0!important;background:#fff!important;color:#14213a!important;font-family:Arial,Helvetica,sans-serif!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-      body>main{display:none!important}
-      body>#printDocument{display:block!important;position:static!important;width:100%!important;margin:0!important;padding:0!important;background:#fff!important}
-      .print-page{width:100%;break-after:page;page-break-after:always}
-      .print-page:last-child{break-after:auto;page-break-after:auto}
-      .print-head{display:flex!important;justify-content:space-between!important;align-items:flex-end!important;gap:10mm!important;border-bottom:.35mm solid #172f68!important;padding:0 0 3mm!important;margin:0 0 3mm!important}
-      .print-head h1{margin:0!important;color:#132c63!important;font-size:14pt!important;line-height:1.05!important;letter-spacing:-.01em!important}
-      .print-head p{margin:1mm 0 0!important;color:#46566f!important;font-size:7.5pt!important}
-      .print-stamp{font-size:7pt!important;color:#52647d!important;text-align:right!important;white-space:nowrap!important}
-      .print-grade-table{width:100%!important;border-collapse:collapse!important;table-layout:fixed!important;font-size:7.5pt!important}
-      .print-grade-table th,.print-grade-table td{border:.22mm solid #b7c4d8!important;padding:1.2mm 1.5mm!important;vertical-align:top!important}
-      .print-grade-table thead th{background:#edf2fb!important;color:#142d61!important;font-size:7.3pt!important;font-weight:800!important;letter-spacing:.06em!important;text-align:left!important}
-      .print-grade-table .print-time{width:21mm!important;background:#f7f9fd!important;color:#31435f!important;font-weight:800!important;text-align:right!important;white-space:nowrap!important}
-      .print-grade-table tbody tr{height:10mm!important}
-      .print-slot-line{margin:0 0 .6mm!important;padding:0!important;line-height:1.12!important;break-inside:avoid!important}
-      .print-slot-line:last-child{margin-bottom:0!important}
-      .print-slot-line strong{color:#142d61!important;font-size:7.6pt!important}
-      .print-slot-line span{color:#4b5d79!important;font-size:6.8pt!important}
-      .print-empty{color:#9aa7b8!important}
-      .print-list-page{break-before:page;page-break-before:always}
-      .print-course-columns{columns:2!important;column-gap:7mm!important;column-fill:auto!important}
-      .print-course{break-inside:avoid!important;page-break-inside:avoid!important;border-bottom:.2mm solid #d7dfeb!important;padding:0 0 1.8mm!important;margin:0 0 1.8mm!important}
-      .print-course h2{margin:0 0 .8mm!important;color:#142d61!important;font-size:8.4pt!important;line-height:1.14!important}
-      .print-course h2 span{font-weight:500!important;color:#52647d!important}
-      .print-class-list{list-style:none!important;margin:0!important;padding:0!important}
-      .print-class-list li{margin:0 0 1mm!important;padding:0!important;font-size:7pt!important;line-height:1.22!important;color:#293953!important}
-      .print-class-list li:last-child{margin-bottom:0!important}
-      .print-class-list b{color:#142d61!important}
-      .print-prof{color:#50617a!important}
-      .print-note{margin-top:2mm!important;font-size:6.7pt!important;color:#687991!important}
-    }
+    /* Disciplinas desativadas */
+    .deactivated{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 6px 17px rgba(20,38,77,.045);overflow:hidden}.deactivated-top{padding:19px 20px;border-bottom:1px solid var(--line)}.deactivated-title{font-size:17px;font-weight:820;letter-spacing:-.02em}.deactivated-sub{margin-top:3px;color:var(--muted);font-size:12px}.deactivated-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(305px,1fr));gap:14px;padding:16px}.deactivated-card{border:1px solid #ead8d2;border-radius:14px;padding:15px;background:linear-gradient(180deg,#fffaf8,#fff)}.deactivated-code{font-size:16px;font-weight:850;color:#8c3d22}.deactivated-name{margin-top:3px;color:#536176;font-size:12px;min-height:32px}.deactivated-badge{display:inline-flex;margin-top:11px;padding:4px 7px;border-radius:999px;background:#fff0ea;color:#9f3e1b;font-size:10px;font-weight:850;letter-spacing:.05em;text-transform:uppercase}.deactivated-dates{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px}.deactivated-date{padding:8px;border:1px solid #f0e2dd;border-radius:9px;background:#fff}.deactivated-date span{display:block;font-size:9px;color:#9a756b;font-weight:850;letter-spacing:.07em}.deactivated-date strong{display:block;margin-top:2px;font-size:12px;color:#5b3427}.deactivated-detail{margin-top:11px;color:#74645e;font-size:11px}.deactivated-link{display:inline-block;margin-top:10px;color:#315dcc;font-size:11px;font-weight:750;text-decoration:none}.deactivated-link:hover{text-decoration:underline}.deactivated-empty{padding:54px 18px;text-align:center;color:var(--muted)}
   </style>
 </head>
 <body>
@@ -71,35 +32,24 @@
       <div class="top"><div><div class="eyebrow">JÚPITER · PNV</div><h1>Monitor de vagas</h1><p class="sub">Dados consultados pelo servidor.</p><div class="server"><i class="dot" id="dot"></i><span id="serverStatus">Carregando dados</span></div></div></div>
       <div class="timers"><div class="timer"><span>AGORA</span><strong id="clock">--:--:--</strong><small>horário de Brasília</small></div><div class="timer"><span>ATUALIZAÇÃO CURTA</span><strong id="short">--</strong><small id="shortDetail">dados ofertados</small></div><div class="timer"><span>CONSULTA COMPLETA</span><strong id="full">--</strong><small id="fullDetail">lista atual do Júpiter</small></div></div>
     </section>
-    <section class="bar"><div class="count" id="count">Carregando…</div><div class="stamp" id="stamp">—</div></section>
+    <section class="bar"><div class="count" id="count">Carregando…</div><div class="stamp" id="stamp">-</div></section>
     <nav class="semesters" id="semesters" aria-label="Semestres"></nav>
     <div class="semester-note" id="semesterNote" role="status"></div>
     <div class="notice" id="notice"></div>
-    <nav class="view-tabs" aria-label="Seções do monitor"><button class="view-tab active" data-view="monitor">Monitor</button><button class="view-tab" data-view="grade">Grade horária</button><button class="view-tab" data-view="historico">Histórico</button><button class="view-tab" data-view="desativadas">Desativadas</button></nav>
+    <nav class="view-tabs" aria-label="Seções do monitor"><button class="view-tab active" data-view="monitor">Monitor</button><button class="view-tab" data-view="historico">Histórico</button><button class="view-tab" data-view="desativadas">Desativadas</button></nav>
     <section id="monitorView"><nav class="filters" aria-label="Filtros de disponibilidade"><button class="filter active" data-filter="todos">Todas</button><button class="filter" data-filter="disponiveis">Com vagas</button><button class="filter" data-filter="poucos">Poucas vagas</button><button class="filter" data-filter="lotadas">Sem vagas</button></nav><section id="content"><div class="empty">Consultando dados armazenados…</div></section></section>
-    <section id="gradeView" class="hidden"><div class="timetable"><div class="timetable-top"><div class="timetable-title-row"><div><div class="timetable-title">Grade horária</div><div class="timetable-sub">Uma linha para cada disciplina e turma, por dia e horário.</div></div><div class="grade-actions"><button type="button" class="print-action" id="printSchedule">Imprimir grade</button><button type="button" class="docx-action" id="generateDocx">Gerar planilha DOCX</button></div></div><div class="timetable-meta" id="timetableMeta"></div></div><div id="scheduleBody" class="timetable-empty">Carregando grade…</div></div></section>
     <section id="historyView" class="hidden"><div class="history"><div class="history-top"><div class="history-title">Histórico da disciplina</div><div class="history-sub">Snapshots diários compactados · retenção automática apenas por capacidade</div><div class="history-controls"><div class="field"><label for="historyCourse">DISCIPLINA</label><select id="historyCourse" disabled><option>Carregando histórico…</option></select></div><div class="field"><label>PERÍODO</label><div class="periods"><button class="period" data-days="90">90 dias</button><button class="period" data-days="180">6 meses</button><button class="period active" data-days="365">1 ano</button><button class="period" data-days="730">2 anos</button><button class="period" data-days="1825">5 anos</button><button class="period" data-days="todo">Todo histórico</button></div></div><div class="field"><label>VISUALIZAÇÃO</label><div class="metric-toggle"><button class="metric active" data-metric="detalhado">Detalhado</button><button class="metric" data-metric="pessoas">Pessoas</button><button class="metric" data-metric="inscritos">Inscritos</button><button class="metric" data-metric="pendentes">Pendentes</button><button class="metric" data-metric="matriculados">Matriculados</button></div></div></div></div><div id="historyBody" class="history-loading">O histórico será carregado ao abrir esta aba.</div></div></section>
     <section id="deactivatedView" class="hidden"><div class="deactivated"><div class="deactivated-top"><div class="deactivated-title">Disciplinas desativadas</div><div class="deactivated-sub">Encerradas administrativamente no Júpiter. Isso é diferente de não haver turma ofertada no semestre.</div></div><div id="deactivatedBody" class="deactivated-empty">Carregando catálogo de disciplinas desativadas…</div></div></section>
     <div class="footer">Fonte: Júpiter · atualização automática no servidor</div>
   </main>
-  <section id="printDocument" class="print-document" aria-hidden="true"></section>
-  <dialog class="docx-dialog" id="docxDialog" aria-labelledby="docxDialogTitle">
-    <form class="docx-dialog-card" id="docxForm">
-      <div class="docx-dialog-head"><div><div class="docx-dialog-eyebrow">USO ADMINISTRATIVO</div><h2 id="docxDialogTitle">Gerar planilha DOCX</h2><p>Cria um arquivo Word com a grade, o painel de docentes e a relação detalhada das turmas.</p></div><button type="button" class="dialog-close" id="docxClose" aria-label="Fechar">×</button></div>
-      <label class="docx-field"><span>TÍTULO</span><input id="docxTitle" maxlength="120" value="Grade Horária Graduação - PNV"></label>
-      <label class="docx-field"><span>PERÍODO LETIVO</span><input id="docxPeriod" maxlength="80" value=""></label>
-      <div class="docx-dialog-note">Usa apenas os dados já armazenados pelo monitor. Não inicia uma nova consulta ao Júpiter.</div>
-      <div class="docx-dialog-actions"><button type="button" class="dialog-cancel" id="docxCancel">Cancelar</button><button type="submit" class="docx-submit" id="docxSubmit">Baixar DOCX</button></div>
-    </form>
-  </dialog>
 <script src="cartoes.js"></script>
 <script>
   let semestreSelecionado=new URLSearchParams(location.search).get('semestre')||'',semestreAtual=null,semestrePadrao=null,semestres=[],arquivoSemestres=[];
-  let disciplinas=[],desativadas=[],curriculo={versao:1,atualizadoEm:null,porCodigo:{},fontes:[]},meta={},filtro='todos',view='monitor',historyCatalog=[],historyLoaded=false,historyCode='',historyDays='365',historyMetric='detalhado',historySelectedDate='',resizeTimer=null;
+  let disciplinas=[],desativadas=[],meta={},filtro='todos',view='monitor',historyCatalog=[],historyLoaded=false,historyCode='',historyDays='365',historyMetric='detalhado',historySelectedDate='',resizeTimer=null;
   const brt={timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false};
   const fmtDate=new Intl.DateTimeFormat('pt-BR',{timeZone:'UTC',day:'2-digit',month:'short',year:'numeric'});
   const fmtMonth=new Intl.DateTimeFormat('pt-BR',{timeZone:'UTC',month:'short'});
-  const formatTime=(ms)=>ms?new Intl.DateTimeFormat('pt-BR',brt).format(new Date(ms)):'—';
+  const formatTime=(ms)=>ms?new Intl.DateTimeFormat('pt-BR',brt).format(new Date(ms)):'-';
   const number=(n)=>new Intl.NumberFormat('pt-BR').format(n||0);
   // O servidor já entrega "inscritos" como quem aguarda vaga (sem pendentes e matriculados); não subtrair de novo.
   const normT=(t)=>{const p=+t.pendentes||0,m=+t.matriculados||0,i=Math.max(0,+t.inscritos||0),tot=+t.total||0,ocup=i+p+m;return {inscritos:i,pendentes:p,matriculados:m,total:tot,ocupadas:ocup,disponiveis:Math.max(0,tot-ocup)}};
@@ -113,11 +63,11 @@
   function htmlCartaoDisciplina(d){const p=totalPessoas(d),nome=nomeSemCodigo(d.nome,d.codigo);const selo=d.noJupiter===false&&semestreAtual?.situacao==='parcial'?`<span class="frozen-badge" title="O Júpiter não exibe mais esta oferta; os números são o último retrato confirmado.">Congelada${d.retiradaDoJupiterEm?` · fora do Júpiter desde ${formatDateBr(dataIsoBrt(d.retiradaDoJupiterEm))}`:''}</span>`:'';return `<article class="course"><header class="course-head"><div class="course-title-row"><div class="course-title"><span class="code">${escapeHtml(d.codigo)}</span>${nome?`<span class="name"> · ${escapeHtml(nome)}</span>`:''}</div><div class="people"><strong>${number(p.pessoas)}</strong> <span>pessoa${p.pessoas===1?'':'s'}</span></div></div>${selo}</header><div class="turmas">${agruparTurmas(d.turmas).map(htmlTurma).join('')}</div></article>`}
   function htmlTurma(turma){const partes=[`Turma ${escapeHtml(turma.codigo)}`];if(turma.tipoTurma)partes.push(escapeHtml(turma.tipoTurma));if(turma.turmaTeoricaVinculada)partes.push(`vinculada à teórica ${escapeHtml(turma.turmaTeoricaVinculada)}`);if(turma.inicio||turma.fim)partes.push(`${formatDateBr(turma.inicio)} a ${formatDateBr(turma.fim)}`);const profs=turma.professores.length?`Prof.: ${turma.professores.map(escapeHtml).join(', ')}`:'Prof.: não informado no Júpiter';return `<section class="turma"><div class="turma-head">${partes.join(' · ')}</div><div class="turma-horario">${escapeHtml(formatarEncontros(turma.horario))}</div><div class="prof-line">${profs}</div><div class="vagas-scroll"><table class="vagas-tabela"><thead><tr><th scope="col">Tipo de vaga / curso</th><th scope="col">Vagas</th><th scope="col">Inscr.</th><th scope="col">Pend.</th><th scope="col">Matric.</th><th scope="col">Livres</th></tr></thead><tbody>${turma.vagas.map(htmlLinhasDaVaga).join('')}</tbody></table></div></section>`}
   function htmlLinhasDaVaga(v){const n=normT(v),st=status(v);const livres=st==='lotadas'?'<span class="livres bad">lotada</span>':`<span class="livres ${st==='poucos'?'warn':'ok'}">${number(n.disponiveis)}</span>`;const tipo=`<tr class="vaga-tipo"><th scope="row">${escapeHtml(v.categoria)}</th><td>${number(n.total)}</td><td>${number(inscritosDoJupiter(v))}</td><td>${number(n.pendentes)}</td><td>${number(n.matriculados)}</td><td>${livres}</td></tr>`;const cursos=(v.cursos||[]).map(c=>`<tr class="vaga-curso"><th scope="row" title="${escapeHtml(c.nome)}">${escapeHtml(nomeCursoCurto(c.nome))}</th><td>${number(c.vagas)}</td><td>${number(inscritosDoJupiter(c))}</td><td>${number(c.pendentes)}</td><td>${number(c.matriculados)}</td><td></td></tr>`).join('');return tipo+cursos}
-  function formatDateBr(valor){if(!valor)return '—';if(/^\d{4}-\d{2}-\d{2}$/.test(String(valor))){const [ano,mes,dia]=String(valor).split('-');return `${dia}/${mes}/${ano}`}return String(valor)}
+  function formatDateBr(valor){if(!valor)return '-';if(/^\d{4}-\d{2}-\d{2}$/.test(String(valor))){const [ano,mes,dia]=String(valor).split('-');return `${dia}/${mes}/${ano}`}return String(valor)}
   function linkJupiterDisciplina(codigo){return `https://uspdigital.usp.br/jupiterweb/jupDisciplina?sgldis=${encodeURIComponent(codigo)}`}
   const STATUS_SEMESTRE={proximo:'próximo',em_andamento:'em andamento',encerrado:'encerrado'};
   const SITUACAO_SEMESTRE={ao_vivo:'ao vivo no Júpiter',parcial:'parcialmente no Júpiter',congelado:'congelado',aguardando:'aguardando cadastro',arquivado:'arquivado'};
-  function rotuloCurtoSemestre(id){const [ano,periodo]=String(id||'').split('-');return ano&&periodo?`${ano}/${periodo}`:'—'}
+  function rotuloCurtoSemestre(id){const [ano,periodo]=String(id||'').split('-');return ano&&periodo?`${ano}/${periodo}`:'-'}
   function dataIsoBrt(ms){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(ms))}
   function selecionarSemestre(id){semestreSelecionado=id&&id!==semestrePadrao?id:'';const url=new URL(location.href);if(semestreSelecionado)url.searchParams.set('semestre',semestreSelecionado);else url.searchParams.delete('semestre');history.replaceState(null,'',url);historyLoaded=false;load()}
   function renderSemestres(){
@@ -135,16 +85,16 @@
     if(!s){el.className='semester-note';el.innerHTML='';return}
     const periodo=`${formatDateBr(s.inicio)} a ${formatDateBr(s.fim)}`,fonte=s.fonteDatas==='jupiter'?' · datas de início e fim informadas pelo Júpiter':s.fonteDatas?' · datas aproximadas pelo calendário até o Júpiter informar as datas das turmas':'';
     let classe='',texto='';
-    if(s.situacao==='arquivado'){classe='archived';texto=`<b>${escapeHtml(s.rotulo)} — arquivado</b> em ${formatDateBr(dataIsoBrt(s.arquivadoEm))}. Somente consulta: estes dados não são mais atualizados.`}
-    else if(s.situacao==='aguardando'){classe='waiting';texto=`<b>${escapeHtml(s.rotulo)} — aguardando cadastro.</b> As turmas ainda não aparecem no Júpiter. O monitor procura novas turmas automaticamente e esta aba se preenche sozinha quando a primeira for publicada.`}
-    else if(s.situacao==='congelado'){classe='frozen';texto=`<b>${escapeHtml(s.rotulo)} — dados congelados.</b> O Júpiter não exibe mais estas turmas${s.congeladoEm?` (retiradas em ${formatDateBr(dataIsoBrt(s.congeladoEm))})`:''}. Abaixo está o último retrato confirmado. Arquivamento automático previsto para ${formatDateBr(s.arquivamentoPrevistoEm)}.`}
-    else if(s.situacao==='parcial'){classe='frozen';texto=`<b>${escapeHtml(s.rotulo)}</b> — ${number(s.disciplinasNoJupiter)} de ${number(s.totalDisciplinas)} disciplinas ainda aparecem no Júpiter; as marcadas como congeladas mostram o último retrato antes da retirada.`}
-    else{texto=`<b>${escapeHtml(s.rotulo)}</b> — ${STATUS_SEMESTRE[s.status]||''}, dados ao vivo do Júpiter.`}
+    if(s.situacao==='arquivado'){classe='archived';texto=`<b>${escapeHtml(s.rotulo)} - arquivado</b> em ${formatDateBr(dataIsoBrt(s.arquivadoEm))}. Somente consulta: estes dados não são mais atualizados.`}
+    else if(s.situacao==='aguardando'){classe='waiting';texto=`<b>${escapeHtml(s.rotulo)} - aguardando cadastro.</b> As turmas ainda não aparecem no Júpiter. O monitor procura novas turmas automaticamente e esta aba se preenche sozinha quando a primeira for publicada.`}
+    else if(s.situacao==='congelado'){classe='frozen';texto=`<b>${escapeHtml(s.rotulo)} - dados congelados.</b> O Júpiter não exibe mais estas turmas${s.congeladoEm?` (retiradas em ${formatDateBr(dataIsoBrt(s.congeladoEm))})`:''}. Abaixo está o último retrato confirmado. Arquivamento automático previsto para ${formatDateBr(s.arquivamentoPrevistoEm)}.`}
+    else if(s.situacao==='parcial'){classe='frozen';texto=`<b>${escapeHtml(s.rotulo)}</b> - ${number(s.disciplinasNoJupiter)} de ${number(s.totalDisciplinas)} disciplinas ainda aparecem no Júpiter; as marcadas como congeladas mostram o último retrato antes da retirada.`}
+    else{texto=`<b>${escapeHtml(s.rotulo)}</b> - ${STATUS_SEMESTRE[s.status]||''}, dados ao vivo do Júpiter.`}
     el.className=`semester-note show ${classe}`;
     el.innerHTML=`${texto}<small>Período: ${periodo}${fonte}.</small>`;
   }
   // Nome curto do curso nas linhas "reservadas para" (o nome completo vai no title).
-  function nomeCursoCurto(nome){return String(nome||'').replace(/^Escola\s+Polit[eé]cnica\s*[-–]\s*/i,'').replace(/^Habilita[cç][aã]o\s+em\s+/i,'').trim()||nome}
+  function nomeCursoCurto(nome){return String(nome||'').replace(/^Escola\s+Polit[eé]cnica\s*[-\u2013]\s*/i,'').replace(/^Habilita[cç][aã]o\s+em\s+/i,'').trim()||nome}
   function renderDesativadas(){
     const root=document.getElementById('deactivatedBody');
     const lista=[...desativadas].sort((a,b)=>String(b.desativacao||'').localeCompare(String(a.desativacao||''))||String(a.codigo).localeCompare(String(b.codigo)));
@@ -157,294 +107,17 @@
       return `<article class="deactivated-card"><div class="deactivated-code">${escapeHtml(d.codigo)}</div><div class="deactivated-name">${escapeHtml(d.nome||d.codigo)}</div><span class="deactivated-badge">Desativada no Júpiter</span><div class="deactivated-dates"><div class="deactivated-date"><span>ATIVAÇÃO</span><strong>${escapeHtml(formatDateBr(d.ativacao))}</strong></div><div class="deactivated-date"><span>DESATIVAÇÃO</span><strong>${escapeHtml(formatDateBr(d.desativacao))}</strong></div></div><div class="deactivated-detail">${escapeHtml(detalhe)}</div>${sucessora}<a class="deactivated-link" href="${escapeHtml(linkJupiterDisciplina(d.codigo))}" target="_blank" rel="noopener">Abrir no Júpiter</a></article>`;
     }).join('');
   }
-  const GRADE_DAYS=[{key:'seg',short:'SEG',name:'Segunda-feira'},{key:'ter',short:'TER',name:'Terça-feira'},{key:'qua',short:'QUA',name:'Quarta-feira'},{key:'qui',short:'QUI',name:'Quinta-feira'},{key:'sex',short:'SEX',name:'Sexta-feira'},{key:'sab',short:'SÁB',name:'Sábado'},{key:'dom',short:'DOM',name:'Domingo'}];
-  const gradeDayMap={seg:'seg',ter:'ter',qua:'qua',qui:'qui',sex:'sex',sab:'sab','sáb':'sab',dom:'dom'};
-  function minutosHorario(valor){const match=String(valor||'').match(/^(\d{1,2}):(\d{2})$/);if(!match)return null;const h=Number(match[1]),m=Number(match[2]);return h>=0&&h<24&&m>=0&&m<60?h*60+m:null}
-  function textoHora(minutos){const h=Math.floor(minutos/60),m=minutos%60;return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`}
-  function extrairEncontrosGrade(horario){const encontros=[],vistos=new Set(),regex=/\b(seg|ter|qua|qui|sex|s[aá]b|dom)\b\s*(\d{1,2}:\d{2})\s*(\d{1,2}:\d{2})/gi;let match;while((match=regex.exec(String(horario||'')))){const dia=gradeDayMap[String(match[1]).toLowerCase()]||String(match[1]).toLowerCase(),inicio=minutosHorario(match[2]),fim=minutosHorario(match[3]);if(inicio==null||fim==null||fim<=inicio)continue;const chave=`${dia}|${inicio}|${fim}`;if(!vistos.has(chave)){vistos.add(chave);encontros.push({dia,inicio,fim})}}return encontros}
-  function construirGradeSimplificada(){
-    // Cada célula representa um dia + intervalo exato. Dentro dela, as disciplinas
-    // são listadas por código e as turmas da mesma disciplina ficam empilhadas abaixo.
-    // Modalidades de vaga não duplicam uma turma.
-    const slots=new Map();
-    for(const disciplina of disciplinas){
-      for(const turma of disciplina.turmas||[]){
-        const codigoTurma=String(turma.codigo||turma.grupoTurma||'—');
-        for(const encontro of extrairEncontrosGrade(turma.horario)){
-          const slotKey=`${encontro.dia}|${encontro.inicio}|${encontro.fim}`;
-          if(!slots.has(slotKey))slots.set(slotKey,{...encontro,disciplinas:new Map()});
-          const slot=slots.get(slotKey);
-          if(!slot.disciplinas.has(disciplina.codigo)){
-            slot.disciplinas.set(disciplina.codigo,{codigo:disciplina.codigo,nome:disciplina.nome,turmas:new Set()});
-          }
-          slot.disciplinas.get(disciplina.codigo).turmas.add(codigoTurma);
-        }
-      }
-    }
-    return [...slots.values()].map(slot=>({
-      ...slot,
-      cursos:[...slot.disciplinas.values()].map(curso=>({...curso,turmas:[...curso.turmas].sort()})).sort((a,b)=>a.codigo.localeCompare(b.codigo))
-    })).sort((a,b)=>a.inicio-b.inicio||a.fim-b.fim||a.dia.localeCompare(b.dia));
-  }
-  function professoresDaTurma(codigo,turma){const d=disciplinas.find(x=>x.codigo===codigo);return [...new Set((d?.turmas||[]).filter(t=>t.codigo===turma).flatMap(t=>t.professores||[]))]}
-  function renderGrade(){
-    const root=document.getElementById('scheduleBody'),metaRoot=document.getElementById('timetableMeta');
-    const slots=construirGradeSimplificada();
-    const semHorario=[...new Set(disciplinas.filter(d=>!(d.turmas||[]).some(t=>extrairEncontrosGrade(t.horario).length)).map(d=>d.codigo))];
-    if(!slots.length){metaRoot.innerHTML='';root.className='timetable-empty';root.textContent='Nenhuma turma com horário reconhecido está disponível.';return}
-    const dias=GRADE_DAYS.filter(d=>slots.some(s=>s.dia===d.key));
-    const codigos=new Set(slots.flatMap(s=>s.cursos.map(c=>c.codigo)));
-    metaRoot.innerHTML=`<span class="timetable-pill">${number(codigos.size)} disciplinas</span><span class="timetable-pill">${number(slots.length)} horários</span>`;
-    const porSlot=new Map(slots.map(slot=>[`${slot.dia}|${slot.inicio}|${slot.fim}`,slot]));
-    const linhas=[...new Map(slots.map(slot=>[`${slot.inicio}|${slot.fim}`,{inicio:slot.inicio,fim:slot.fim}])).values()].sort((a,b)=>a.inicio-b.inicio||a.fim-b.fim);
-    const cabecalho=`<thead><tr><th class="time-head">HORÁRIO</th>${dias.map(d=>`<th title="${d.name}">${d.short}</th>`).join('')}</tr></thead>`;
-    const corpo=linhas.map(linha=>{
-      const horario=`${textoHora(linha.inicio)}–${textoHora(linha.fim)}`;
-      const celulas=dias.map(dia=>{
-        const slot=porSlot.get(`${dia.key}|${linha.inicio}|${linha.fim}`);
-        if(!slot)return '<td class="slot-cell empty-slot"></td>';
-        const linhasCurso=slot.cursos.flatMap(curso=>curso.turmas.map(turma=>({curso,turma})));
-        const cursos=linhasCurso.map(({curso,turma})=>{
-          const profs=professoresDaTurma(curso.codigo,turma),titulo=`${curso.codigo} — ${curso.nome}\nTurma ${turma}${profs.length?`\nProf.: ${profs.join(', ')}`:''}`;
-          return `<div class="slot-course${linhasCurso.length>1?' multi-course':''}" title="${escapeHtml(titulo)}"><span class="slot-code">${escapeHtml(curso.codigo)} <span class="slot-turma">· Turma ${escapeHtml(turma)}</span></span></div>`;
-        }).join('');
-        return `<td class="slot-cell"><div class="slot-stack">${cursos}</div></td>`;
-      }).join('');
-      return `<tr><th scope="row" class="time-cell">${horario}</th>${celulas}</tr>`;
-    }).join('');
-    root.className='';
-    root.innerHTML=`<div class="timetable-scroll"><table class="simple-timetable">${cabecalho}<tbody>${corpo}</tbody></table></div>${semHorario.length?`<div class="timetable-noschedule">${number(semHorario.length)} disciplina${semHorario.length===1?'':'s'} sem horário reconhecido: ${semHorario.map(escapeHtml).join(', ')}.</div>`:''}`;
-  }
-  function categoriaComVagasOfertadas(turma){
-    const vagas=Number(turma?.total ?? turma?.vagas ?? 0);
-    return Number.isFinite(vagas)&&vagas>0;
-  }
-  function turmasFisicasParaImpressao(disciplina){
-    const mapa=new Map();
-    for(const turma of disciplina.turmas||[]){
-      const professores=Array.isArray(turma.professores)?turma.professores.filter(Boolean):[];
-      const chave=[turma.codigo||'',turma.horario||'',turma.tipoTurma||'',turma.turmaTeoricaVinculada||'',professores.join('|')].join('¦');
-      if(!mapa.has(chave))mapa.set(chave,{codigo:String(turma.codigo||turma.grupoTurma||'—'),horario:String(turma.horario||'Horário não informado'),tipo:String(turma.tipoTurma||''),vinculada:turma.turmaTeoricaVinculada||'',professores,categorias:new Set()});
-      // Categorias com 0 vagas não representam oferta e não entram na impressão.
-      if(turma.categoria&&categoriaComVagasOfertadas(turma))mapa.get(chave).categorias.add(String(turma.categoria));
-    }
-    return [...mapa.values()].sort((a,b)=>a.codigo.localeCompare(b.codigo)||a.horario.localeCompare(b.horario));
-  }
-  function dataImpressao(){return new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'medium',timeStyle:'short'}).format(new Date())}
-  function nomeSemCodigo(nome,codigo){
-    return String(nome||'Disciplina').replace(new RegExp(`^\\s*${String(codigo||'').replace(/[.*+?^${}()|[\\]\\]/g,'\\$&')}\\s*[-–—:]?\\s*`,'i'),'').trim()||String(nome||'Disciplina');
-  }
-  function professoresDaDisciplina(disciplina){
-    const vistos=new Set(),out=[];
-    for(const turma of disciplina.turmas||[])for(const professor of (Array.isArray(turma.professores)?turma.professores:[])){
-      const nome=String(professor||'').replace(/\s+/g,' ').trim();
-      const chave=nome.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-      if(nome&&!vistos.has(chave)){vistos.add(chave);out.push(nome)}
-    }
-    return out;
-  }
-  function categoriasDaDisciplina(disciplina){
-    return new Set((disciplina.turmas||[]).map(t=>String(t.categoria||'').toLocaleLowerCase('pt-BR')).filter(Boolean));
-  }
-  function tituloCurricular(item){
-    const rotulo=String(item?.rotulo||'').trim();
-    if(rotulo)return rotulo;
-    const periodo=Number(item?.periodo||0);
-    return Number.isFinite(periodo)&&periodo>0?`${Math.ceil(periodo/2)}º ano · ${periodo}º semestre`:'';
-  }
-  function obterGrupoDocentes(disciplina){
-    const item=curriculo?.porCodigo?.[disciplina.codigo]||null;
-    const titulo=tituloCurricular(item);
-    if(titulo){
-      const periodo=Number(item?.periodo||99);
-      return {chave:`curricular:${periodo}:${titulo}`,titulo,ordem:Number.isFinite(periodo)?periodo:99,tipo:'curricular'};
-    }
-    // “Optativa Livre” e “Optativa Eletiva” na página de turma são categorias
-    // de vagas, não a classificação curricular da disciplina. Só exibimos
-    // “Optativas” quando a própria grade curricular do Júpiter confirmou isso.
-    if(String(item?.tipoCurricular||'').toLowerCase()==='optativa'){
-      return {chave:'optativas',titulo:'Optativas',ordem:900,tipo:'especial'};
-    }
-    return {chave:'sem-classificacao',titulo:'Classificação curricular pendente no Júpiter',ordem:999,tipo:'especial'};
-  }
-  function gruposDocentesDinamicos(){
-    const mapa=new Map();
-    for(const disciplina of disciplinas){
-      const grupo=obterGrupoDocentes(disciplina);
-      if(!mapa.has(grupo.chave))mapa.set(grupo.chave,{...grupo,cursos:[]});
-      mapa.get(grupo.chave).cursos.push(disciplina);
-    }
-    return [...mapa.values()]
-      .map(grupo=>({...grupo,cursos:grupo.cursos.sort((a,b)=>a.codigo.localeCompare(b.codigo))}))
-      .sort((a,b)=>a.ordem-b.ordem||a.titulo.localeCompare(b.titulo,'pt-BR'));
-  }
-  function montarPainelDocentesImpressao(){
-    const grupos=gruposDocentesDinamicos();
-    return `<aside class="print-faculty"><h2 class="print-faculty-title">DOCENTES</h2>${grupos.map(grupo=>`<section class="print-faculty-group"><h2>${escapeHtml(grupo.titulo)}</h2>${grupo.cursos.map(d=>{
-      const professores=professoresDaDisciplina(d);
-      const textoProf=professores.length?professores.join(', '):'ainda não sincronizado';
-      return `<p class="print-faculty-course"><b>${escapeHtml(d.codigo)}</b> — ${escapeHtml(nomeSemCodigo(d.nome,d.codigo))}<br><span>Prof.: ${escapeHtml(textoProf)}</span></p>`;
-    }).join('')}</section>`).join('')}<p class="print-faculty-note">Classificação curricular lida automaticamente das habilitações naval atual e históricas do Júpiter.</p></aside>`;
-  }
-  function slotsImpressaoPorDia(){
-    const base=construirGradeSimplificada();
-    const porDia=new Map();
-    for(const dia of GRADE_DAYS)porDia.set(dia.key,[]);
-    for(const slot of base){
-      const chave=[slot.dia,slot.inicio,slot.fim].join('|');
-      const cursos=slot.cursos.map(c=>({codigo:c.codigo,turmas:[...c.turmas]}));
-      if(porDia.has(slot.dia))porDia.get(slot.dia).push({id:chave,inicio:slot.inicio,fim:slot.fim,cursos});
-    }
-    return porDia;
-  }
-  function posicionarEventosImpressao(eventos){
-    const ordenados=[...eventos].sort((a,b)=>a.inicio-b.inicio||a.fim-b.fim||a.id.localeCompare(b.id));
-    let i=0;
-    while(i<ordenados.length){
-      let fimGrupo=ordenados[i].fim,j=i+1;
-      while(j<ordenados.length&&ordenados[j].inicio<fimGrupo){fimGrupo=Math.max(fimGrupo,ordenados[j].fim);j++}
-      const grupo=ordenados.slice(i,j),colunas=[],ativos=[];
-      for(const evento of grupo){
-        for(let n=ativos.length-1;n>=0;n--)if(ativos[n].fim<=evento.inicio)ativos.splice(n,1);
-        const ocupadas=new Set(ativos.map(x=>x.coluna));
-        let coluna=0;while(ocupadas.has(coluna))coluna++;
-        evento.coluna=coluna;ativos.push(evento);colunas[coluna]=true;
-      }
-      const largura=Math.max(1,colunas.length);
-      grupo.forEach(e=>e.colunas=largura);
-      i=j;
-    }
-    return ordenados;
-  }
-  function montarGradeImpressaoVisual(opcoes={}){
-    const porDia=slotsImpressaoPorDia();
-    const dias=GRADE_DAYS.filter(d=>(porDia.get(d.key)||[]).length);
-    if(!dias.length)return '<p class="print-note">Nenhuma turma com horário reconhecido está disponível.</p>';
-    const inicio=450, fim=1110, duracao=fim-inicio, alturaMm=Number(opcoes.alturaMm||169);
-    const pos=(min)=>Math.max(0,Math.min(100,((min-inicio)/duracao)*100));
-    const linhas=[450,500,560,610,670,720,790,840,900,950,1010,1060,1110];
-    const principais=new Set([450,560,670,790,900,1010]);
-    const cabecalho=`<div class="print-grade-days" style="--print-days:${dias.length}"><div class="print-time-head">HORÁRIO</div>${dias.map(d=>`<div class="print-day-head">${escapeHtml(d.name)}</div>`).join('')}</div>`;
-    const trilhoConteudo=linhas.map(m=>`<span class="print-time-label${principais.has(m)?' major':''}" style="top:${pos(m)}%">${textoHora(m)}</span>`).join('');
-    const colunas=dias.map(dia=>{
-      const eventos=posicionarEventosImpressao(porDia.get(dia.key)||[]);
-      const grade=linhas.map(m=>`<span class="print-grid-line${principais.has(m)?' major':''}" style="top:${pos(m)}%"></span>`).join('');
-      const cards=eventos.map(evento=>{
-        const top=pos(evento.inicio),height=Math.max(3.1,pos(evento.fim)-top),largura=100/evento.colunas,esquerda=evento.coluna*largura;
-        const principal=evento.cursos.map(c=>c.codigo).join(' · ');
-        const linhasCurso=evento.cursos.map(c=>{
-          const turmas=c.turmas.map(t=>`T${t}`).join(', ');
-          return evento.cursos.length===1?turmas:`${c.codigo} ${turmas}`;
-        });
-        const classes=linhasCurso.length>1?' multiple':'';
-        return `<article class="print-event${classes}" style="top:calc(${top}% + .7mm);height:calc(${height}% - 1.4mm);left:calc(${esquerda}% + .7mm);width:calc(${largura}% - 1.4mm)"><span class="print-event-code">${escapeHtml(principal)}</span><span class="print-event-class">${escapeHtml(linhasCurso.join(' · '))}</span></article>`;
-      }).join('');
-      return `<section class="print-day-canvas">${grade}${cards}</section>`;
-    }).join('');
-    const tituloInterno=opcoes.incluirTitulo?`<div class="print-title"><h1>Grade Horária Graduação · PNV</h1><p>Disciplinas ofertadas no Júpiter · horários vigentes</p></div>`:'';
-    return `<div class="print-grade-main print-simple-main">${tituloInterno}${cabecalho}<div class="print-grade-body" style="height:${alturaMm}mm"><div class="print-time-rail">${trilhoConteudo}</div><div class="print-week-grid" style="--print-days:${dias.length}">${colunas}</div></div></div>`;
-  }
-  function montarTabelaImpressaoGrade(){
-    const slots=construirGradeSimplificada();
-    if(!slots.length)return '<p class="print-note">Nenhuma turma com horário reconhecido está disponível.</p>';
-    const dias=GRADE_DAYS.filter(dia=>slots.some(slot=>slot.dia===dia.key));
-    const porSlot=new Map(slots.map(slot=>[`${slot.dia}|${slot.inicio}|${slot.fim}`,slot]));
-    const linhas=[...new Map(slots.map(slot=>[`${slot.inicio}|${slot.fim}`,{inicio:slot.inicio,fim:slot.fim}])).values()]
-      .sort((a,b)=>a.inicio-b.inicio||a.fim-b.fim);
-    const cabecalho=`<thead><tr><th class="print-time">HORÁRIO</th>${dias.map(dia=>`<th>${escapeHtml(dia.short)}</th>`).join('')}</tr></thead>`;
-    const corpo=linhas.map(linha=>{
-      const celulas=dias.map(dia=>{
-        const slot=porSlot.get(`${dia.key}|${linha.inicio}|${linha.fim}`);
-        if(!slot)return '<td class="print-empty">—</td>';
-        return `<td>${slot.cursos.map(curso=>`<div class="print-slot-line"><strong>${escapeHtml(curso.codigo)}</strong><span> · ${curso.turmas.map(turma=>`T${escapeHtml(turma)}`).join(', ')}</span></div>`).join('')}</td>`;
-      }).join('');
-      return `<tr><th class="print-time">${textoHora(linha.inicio)}–${textoHora(linha.fim)}</th>${celulas}</tr>`;
-    }).join('');
-    return `<table class="print-grade-table">${cabecalho}<tbody>${corpo}</tbody></table>`;
-  }
-
-  function montarListaImpressaoDisciplinas(){
-    const lista=[...disciplinas].sort((a,b)=>a.codigo.localeCompare(b.codigo));
-    if(!lista.length)return '<p class="print-note">Nenhuma disciplina ofertada foi registrada.</p>';
-    return `<div class="print-course-columns">${lista.map(disciplina=>{
-      const turmas=turmasFisicasParaImpressao(disciplina);
-      const professoresDaDisciplinaAtual=professoresDaDisciplina(disciplina);
-      return `<article class="print-course"><h2>${escapeHtml(disciplina.codigo)} <span>— ${escapeHtml(nomeSemCodigo(disciplina.nome,disciplina.codigo))}</span></h2><ul class="print-class-list">${turmas.map(turma=>{
-        const detalheVinculo=turma.vinculada?` · vinculada à T${escapeHtml(turma.vinculada)}`:'';
-        const categorias=[...turma.categorias].join(', ');
-        const professores=(turma.professores.length?turma.professores:professoresDaDisciplinaAtual);
-        const textoProf=professores.length?professores.map(escapeHtml).join(', '):'ainda não sincronizado';
-        return `<li><b>Turma ${escapeHtml(turma.codigo)}</b>${detalheVinculo} · ${escapeHtml(turma.horario)}${categorias?` · ${escapeHtml(categorias)}`:''}<br><span class="print-prof">Prof.: ${textoProf}</span></li>`;
-      }).join('')}</ul></article>`;
-    }).join('')}</div>`;
-  }
-  function prepararDocumentoImpressao(){
-    const root=document.getElementById('printDocument');
-    const ultima=meta.ultimaAtualizacao?formatTime(meta.ultimaAtualizacao):'—';
-    root.innerHTML=`<section class="print-page print-grade-page"><header class="print-head"><div><h1>Grade Horária PNV${semestreAtual?` · ${escapeHtml(rotuloCurtoSemestre(semestreAtual.id))}`:''}</h1><p>${semestreAtual?escapeHtml(semestreAtual.rotulo)+(semestreAtual.situacao==='ao_vivo'?' · dados ao vivo do Júpiter.':' · último retrato registrado pelo monitor.'):'Disciplinas atualmente ofertadas no Júpiter.'}</p></div><div class="print-stamp">Gerado em ${escapeHtml(dataImpressao())}<br>Última atualização: ${escapeHtml(ultima)}</div></header>${montarTabelaImpressaoGrade()}<p class="print-note">Códigos e turmas por dia e intervalo. Disciplinas que coincidem no mesmo horário são listadas juntas na célula correspondente.</p></section><section class="print-page print-list-page"><header class="print-head"><div><h1>Disciplinas PNV ofertadas</h1><p>Turmas, horários e docentes informados pelo Júpiter.</p></div><div class="print-stamp">Gerado em ${escapeHtml(dataImpressao())}<br>Última atualização: ${escapeHtml(ultima)}</div></header>${montarListaImpressaoDisciplinas()}</section>`;
-  }
-  function imprimirGrade(){prepararDocumentoImpressao();requestAnimationFrame(()=>window.print())}
-
-  // ===== GERAÇÃO DOCX NO NAVEGADOR =====
-  // Não há dependência externa: o arquivo Word é montado em OOXML e compactado
-  // localmente. Assim o botão administrativo não consulta o Júpiter, não requer
-  // API adicional e não introduz fontes ou bibliotecas remotas.
-  const DOCX_NS='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
-  const DOCX_MIME='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-  const DOCX_ENCODER=new TextEncoder();
-  const DOCX_CRC_TABLE=(()=>{const tabela=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);tabela[n]=c>>>0}return tabela})();
-  function docxEsc(valor){return String(valor??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[ch]))}
-  function docxCrc32(bytes){let c=0xffffffff;for(const byte of bytes)c=DOCX_CRC_TABLE[(c^byte)&255]^(c>>>8);return (c^0xffffffff)>>>0}
-  function docxU16(valor){return new Uint8Array([valor&255,(valor>>>8)&255])}
-  function docxU32(valor){return new Uint8Array([valor&255,(valor>>>8)&255,(valor>>>16)&255,(valor>>>24)&255])}
-  function docxConcat(partes){const total=partes.reduce((s,p)=>s+p.length,0),saida=new Uint8Array(total);let pos=0;for(const parte of partes){saida.set(parte,pos);pos+=parte.length}return saida}
-  function docxZipStore(arquivos){const locais=[],centrais=[];let offset=0;for(const arquivo of arquivos){const nome=DOCX_ENCODER.encode(arquivo.nome),dados=DOCX_ENCODER.encode(arquivo.texto),crc=docxCrc32(dados);const local=docxConcat([docxU32(0x04034b50),docxU16(20),docxU16(0),docxU16(0),docxU16(0),docxU16(0),docxU32(crc),docxU32(dados.length),docxU32(dados.length),docxU16(nome.length),docxU16(0),nome,dados]);locais.push(local);const central=docxConcat([docxU32(0x02014b50),docxU16(20),docxU16(20),docxU16(0),docxU16(0),docxU16(0),docxU16(0),docxU32(crc),docxU32(dados.length),docxU32(dados.length),docxU16(nome.length),docxU16(0),docxU16(0),docxU16(0),docxU16(0),docxU32(0),docxU32(offset),nome]);centrais.push(central);offset+=local.length}const centralInicio=offset,centralBytes=docxConcat(centrais),fim=docxConcat([docxU32(0x06054b50),docxU16(0),docxU16(0),docxU16(arquivos.length),docxU16(arquivos.length),docxU32(centralBytes.length),docxU32(centralInicio),docxU16(0)]);return docxConcat([...locais,centralBytes,fim])}
-  function docxRun(texto,opcoes={}){const pr=[];if(opcoes.bold)pr.push('<w:b/>');if(opcoes.italic)pr.push('<w:i/>');if(opcoes.size)pr.push(`<w:sz w:val="${opcoes.size}"/>`);if(opcoes.color)pr.push(`<w:color w:val="${docxEsc(String(opcoes.color).replace('#',''))}"/>`);if(opcoes.font)pr.push(`<w:rFonts w:ascii="${docxEsc(opcoes.font)}" w:hAnsi="${docxEsc(opcoes.font)}"/>`);return `<w:r>${pr.length?`<w:rPr>${pr.join('')}</w:rPr>`:''}<w:t xml:space="preserve">${docxEsc(texto)}</w:t></w:r>`}
-  function docxBreak(){return '<w:r><w:br/></w:r>'}
-  function docxParagraph(conteudo='',opcoes={}){const pr=[];if(opcoes.align)pr.push(`<w:jc w:val="${opcoes.align}"/>`);if(opcoes.spaceAfter!=null)pr.push(`<w:spacing w:after="${opcoes.spaceAfter}"/>`);if(opcoes.spaceBefore!=null)pr.push(`<w:spacing w:before="${opcoes.spaceBefore}"/>`);if(opcoes.keepNext)pr.push('<w:keepNext/>');if(opcoes.keepLines)pr.push('<w:keepLines/>');return `<w:p>${pr.length?`<w:pPr>${pr.join('')}</w:pPr>`:''}${conteudo}</w:p>`}
-  function docxCell(conteudo='',opcoes={}){const pr=[`<w:tcW w:w="${opcoes.width||1000}" w:type="dxa"/>`,'<w:tcMar><w:top w:w="50" w:type="dxa"/><w:left w:w="68" w:type="dxa"/><w:bottom w:w="50" w:type="dxa"/><w:right w:w="68" w:type="dxa"/></w:tcMar>'];if(opcoes.fill)pr.push(`<w:shd w:val="clear" w:color="auto" w:fill="${docxEsc(String(opcoes.fill).replace('#',''))}"/>`);if(opcoes.vAlign)pr.push(`<w:vAlign w:val="${opcoes.vAlign}"/>`);if(opcoes.gridSpan)pr.push(`<w:gridSpan w:val="${opcoes.gridSpan}"/>`);return `<w:tc><w:tcPr>${pr.join('')}</w:tcPr>${conteudo||'<w:p/>'}</w:tc>`}
-  function docxBorders(cor='172033',tam=6){return `<w:tblBorders><w:top w:val="single" w:sz="${tam}" w:space="0" w:color="${cor}"/><w:left w:val="single" w:sz="${tam}" w:space="0" w:color="${cor}"/><w:bottom w:val="single" w:sz="${tam}" w:space="0" w:color="${cor}"/><w:right w:val="single" w:sz="${tam}" w:space="0" w:color="${cor}"/><w:insideH w:val="single" w:sz="${Math.max(2,tam-2)}" w:space="0" w:color="${cor}"/><w:insideV w:val="single" w:sz="${Math.max(2,tam-2)}" w:space="0" w:color="${cor}"/></w:tblBorders>`}
-  function docxTable(linhas,larguras,opcoes={}){const largura=larguras.reduce((s,v)=>s+v,0);const props=`<w:tblW w:w="${largura}" w:type="dxa"/><w:tblLayout w:type="fixed"/>${opcoes.borders===false?'<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>':docxBorders(opcoes.borderColor||'172033',opcoes.borderSize||5)}`;return `<w:tbl><w:tblPr>${props}</w:tblPr><w:tblGrid>${larguras.map(w=>`<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>${linhas.join('')}</w:tbl>`}
-  function docxRow(celulas,opcoes={}){const pr=[];if(opcoes.height)pr.push(`<w:trHeight w:val="${opcoes.height}" w:hRule="atLeast"/>`);if(opcoes.header)pr.push('<w:tblHeader/>');return `<w:tr>${pr.length?`<w:trPr>${pr.join('')}</w:trPr>`:''}${celulas.join('')}</w:tr>`}
-  function docxTextoCelula(linhas,opcoes={}){const itens=Array.isArray(linhas)?linhas:[linhas];return itens.map((linha,indice)=>docxParagraph(docxRun(linha.text||linha,{bold:!!linha.bold,size:linha.size||opcoes.size||16,color:linha.color||opcoes.color||'172033'}),{align:linha.align||opcoes.align||'left',spaceAfter:indice===itens.length-1?0:15,keepLines:true})).join('')}
-  function semestrePadraoDocx(){if(semestreAtual?.id){const [ano,periodo]=semestreAtual.id.split('-');return `${periodo}º Semestre ${ano}`}const partes=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit'}).formatToParts(new Date()),ano=partes.find(p=>p.type==='year')?.value||String(new Date().getFullYear()),mes=Number(partes.find(p=>p.type==='month')?.value||'1');return `${mes>=6?'2º':'1º'} Semestre ${ano}`}
-  function encontrosPorFaixaDocx(dia,inicio,fim){const mapa=new Map();for(const disciplina of disciplinas){for(const turma of turmasFisicasParaImpressao(disciplina)){for(const encontro of extrairEncontrosGrade(turma.horario)){if(encontro.dia!==dia||encontro.inicio>=fim||encontro.fim<=inicio)continue;const chave=disciplina.codigo;if(!mapa.has(chave))mapa.set(chave,{codigo:disciplina.codigo,turmas:new Set()});mapa.get(chave).turmas.add(turma.codigo)}}}return [...mapa.values()].sort((a,b)=>a.codigo.localeCompare(b.codigo))}
-  const DOCX_HORARIOS=[{inicio:450,fim:500},{inicio:500,fim:550},{inicio:560,fim:610},{inicio:610,fim:660},{inicio:670,fim:720},{inicio:720,fim:770},{inicio:790,fim:840},{inicio:840,fim:890},{inicio:900,fim:950},{inicio:950,fim:1000},{inicio:1010,fim:1060},{inicio:1070,fim:1110}];
-  function montarTabelaGradeDocx(){const base=construirGradeSimplificada(),dias=GRADE_DAYS.filter(d=>base.some(s=>s.dia===d.key));if(!dias.length)return docxParagraph(docxRun('Nenhuma turma com horário reconhecido está disponível.',{size:18,color:'64748B'}));const larguras=[790,...dias.map(()=>Math.floor(10650/dias.length))];const cabecalho=docxRow([docxCell(docxTextoCelula([{text:'HORÁRIO',bold:true,size:13,align:'center'}],{align:'center'}),{width:larguras[0],fill:'F1F5F9',vAlign:'center'}),...dias.map((dia,i)=>docxCell(docxTextoCelula([{text:dia.name.toUpperCase(),bold:true,size:13,align:'center'}],{align:'center'}),{width:larguras[i+1],fill:'F1F5F9',vAlign:'center'}))],{height:300,header:true});const linhas=DOCX_HORARIOS.map(bloco=>{const horario=`${textoHora(bloco.inicio)}\n${textoHora(bloco.fim)}`.split('\n').map((text,i)=>({text,bold:i===0,size:12,align:'center',color:i===0?'9B3328':'475569'}));const celulas=[docxCell(docxTextoCelula(horario,{align:'center'}),{width:larguras[0],fill:'F8FAFC',vAlign:'center'})];for(let i=0;i<dias.length;i++){const eventos=encontrosPorFaixaDocx(dias[i].key,bloco.inicio,bloco.fim);if(!eventos.length){celulas.push(docxCell(docxParagraph('',{}),{width:larguras[i+1],fill:'0B73B5',vAlign:'center'}));continue}const conteudo=[];for(const evento of eventos){conteudo.push(docxParagraph(docxRun(`${evento.codigo} · ${[...evento.turmas].map(t=>`T${t}`).join(', ')}`,{bold:true,size:eventos.length>2?11:12,color:'112B60'}),{align:'center',spaceAfter:20,keepLines:true}));}celulas.push(docxCell(conteudo.join(''),{width:larguras[i+1],fill:'FFFFFF',vAlign:'center'}));}return docxRow(celulas,{height:eventosAlturaDocx(bloco)})});return docxTable([cabecalho,...linhas],larguras,{borderColor:'172033',borderSize:5})}
-  function eventosAlturaDocx(bloco){return bloco.fim-bloco.inicio>=50?560:480}
-  function montarPainelDocentesDocx(){
-    const grupos=gruposDocentesDinamicos();
-    const partes=[docxParagraph(docxRun('DOCENTES',{bold:true,size:16,color:'111111'}),{align:'center',spaceAfter:80,keepNext:true})];
-    for(const grupo of grupos){
-      partes.push(docxParagraph(docxRun(grupo.titulo,{bold:true,size:13,color:'A33227'}),{spaceBefore:45,spaceAfter:25,keepNext:true}));
-      for(const curso of grupo.cursos){
-        const professores=professoresDaDisciplina(curso);
-        const linha=`${curso.codigo} — ${nomeSemCodigo(curso.nome,curso.codigo)}; Prof.: ${professores.length?professores.join(', '):'ainda não sincronizado'}`;
-        partes.push(docxParagraph(docxRun(linha,{size:10,color:'172033'}),{spaceAfter:20,keepLines:true}));
-      }
-    }
-    partes.push(docxParagraph(docxRun('Classificação curricular lida automaticamente das habilitações naval atual e históricas do Júpiter.',{size:9,color:'64748B',italic:true}),{spaceBefore:50}));
-    return partes.join('');
-  }
-  function montarListaDocx(){const partes=[];for(const disciplina of [...disciplinas].sort((a,b)=>a.codigo.localeCompare(b.codigo))){partes.push(docxParagraph(docxRun(`${disciplina.codigo} — ${nomeSemCodigo(disciplina.nome,disciplina.codigo)}`,{bold:true,size:20,color:'102C62'}),{spaceBefore:110,spaceAfter:40,keepNext:true}));for(const turma of turmasFisicasParaImpressao(disciplina)){const categorias=[...turma.categorias].join(', ');const professores=turma.professores.length?turma.professores:professoresDaDisciplina(disciplina);const vinculo=turma.vinculada?` · vinculada à T${turma.vinculada}`:'';partes.push(docxParagraph(docxRun(`Turma ${turma.codigo}${vinculo} · ${turma.horario}${categorias?` · ${categorias}`:''}`,{bold:true,size:15,color:'253B68'}),{spaceAfter:8,keepLines:true}));partes.push(docxParagraph(docxRun(`Docentes: ${professores.length?professores.join(', '):'ainda não sincronizado'}`,{size:14,color:'53657F'}),{spaceAfter:28,keepLines:true}));}}return partes.join('')}
-  function montarDocumentoDocx(titulo,periodo){const ultima=meta.ultimaAtualizacao?formatTime(meta.ultimaAtualizacao):'—';const gerado=dataImpressao();const tituloFinal=(titulo||'Grade Horária Graduação - PNV').trim();const periodoFinal=(periodo||semestrePadraoDocx()).trim();const cabecalho=[docxParagraph(docxRun(tituloFinal,{bold:true,size:30,color:'111111'}),{align:'center',spaceAfter:30,keepNext:true}),docxParagraph(docxRun(periodoFinal,{bold:true,size:18,color:'A33227'}),{align:'center',spaceAfter:55,keepNext:true}),docxParagraph(docxRun(`Gerado em ${gerado} · Última atualização dos dados: ${ultima}`,{size:11,color:'64748B'}),{align:'center',spaceAfter:90})].join('');const grade=montarTabelaGradeDocx();const docentes=montarPainelDocentesDocx();const primeiraPagina=docxTable([docxRow([docxCell(`${grade}<w:p/>`,{width:11440,vAlign:'top'}),docxCell(docentes,{width:4300,vAlign:'top'})])],[11440,4300],{borderColor:'172033',borderSize:7});const lista=[docxParagraph('<w:r><w:br w:type="page"/></w:r>',{}),docxParagraph(docxRun('Disciplinas PNV ofertadas',{bold:true,size:28,color:'111111'}),{spaceAfter:25,keepNext:true}),docxParagraph(docxRun(`Turmas, horários e docentes informados pelo Júpiter · ${gerado}`,{size:12,color:'53657F'}),{spaceAfter:65}),montarListaDocx()].join('');const body=`${cabecalho}${primeiraPagina}${lista}<w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="360" w:right="360" w:bottom="360" w:left="360" w:header="180" w:footer="180" w:gutter="0"/></w:sectPr>`;return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${DOCX_NS}><w:body>${body}</w:body></w:document>`}
-  function arquivosDocx(titulo,periodo){const agora=new Date().toISOString();return [{nome:'[Content_Types].xml',texto:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>'},{nome:'_rels/.rels',texto:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>'},{nome:'word/_rels/document.xml.rels',texto:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'},{nome:'word/styles.xml',texto:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="18"/><w:lang w:val="pt-BR"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style></w:styles>'},{nome:'docProps/core.xml',texto:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${docxEsc(titulo||'Grade Horária Graduação - PNV')}</dc:title><dc:creator>Monitor de vagas PNV</dc:creator><cp:lastModifiedBy>Monitor de vagas PNV</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${agora}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${agora}</dcterms:modified></cp:coreProperties>`},{nome:'docProps/app.xml',texto:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Monitor de vagas PNV</Application></Properties>'},{nome:'word/document.xml',texto:montarDocumentoDocx(titulo,periodo)}]}
-  function slugArquivo(valor){return String(valor||'grade-horaria-pnv').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80)||'grade-horaria-pnv'}
-  function baixarPlanilhaDocx(titulo,periodo){if(!disciplinas.length){alert('Ainda não há disciplinas ofertadas armazenadas para gerar a planilha.');return}const dados=docxZipStore(arquivosDocx(titulo,periodo));const blob=new Blob([dados],{type:DOCX_MIME});const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`${slugArquivo(titulo)}-${slugArquivo(periodo)}.docx`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
-  function abrirDialogDocx(){const dialog=document.getElementById('docxDialog');document.getElementById('docxPeriod').value=semestrePadraoDocx();if(typeof dialog.showModal==='function'&&!dialog.open)dialog.showModal();else dialog.setAttribute('open','')}
-  function fecharDialogDocx(){const dialog=document.getElementById('docxDialog');if(typeof dialog.close==='function'&&dialog.open)dialog.close();else dialog.removeAttribute('open')}
-
-  function human(ms){if(ms==null||ms<0)return '—';const s=Math.ceil(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;if(h)return `${h}h ${String(m).padStart(2,'0')}m`;if(m)return `${m}m ${String(ss).padStart(2,'0')}s`;return `${ss}s`}
+  function human(ms){if(ms==null||ms<0)return '-';const s=Math.ceil(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;if(h)return `${h}h ${String(m).padStart(2,'0')}m`;if(m)return `${m}m ${String(ss).padStart(2,'0')}s`;return `${ss}s`}
   function updateTimers(){const now=Date.now();document.getElementById('clock').textContent=new Intl.DateTimeFormat('pt-BR',brt).format(new Date(now));document.getElementById('short').textContent=human((meta.proximaAtualizacaoCurta||0)-now);document.getElementById('full').textContent=human((meta.proximaConsultaCompleta||0)-now)}
   function refreshMeta(){const full=meta.fullScan;const primeiroUso=!meta.ultimaAtualizacao&&!full;document.getElementById('stamp').textContent=meta.ultimaAtualizacao?`Última atualização: ${formatTime(meta.ultimaAtualizacao)}`:meta.inicializacaoEmAndamento?'Iniciando a primeira consulta…':'Sem dados armazenados';document.getElementById('serverStatus').textContent=full?.emAndamento?`Sincronização diária: ${full.concluidas}/${full.total}`:primeiroUso?(meta.inicializacaoEmAndamento?'Primeira consulta em andamento':'Aguardando primeira consulta'):'Monitor ativo';document.getElementById('dot').className='dot '+(full?.emAndamento||meta.inicializacaoEmAndamento?'work':'');document.getElementById('shortDetail').textContent=full?.emAndamento?'retoma após a sincronização':primeiroUso?'primeira sincronização':meta.atualizacaoCurtaModo==='procurando_novas_turmas'?'procurando turmas novas':'ofertadas + turmas novas';document.getElementById('fullDetail').textContent=full?.emAndamento?`${full.concluidas}/${full.total} consultadas`:primeiroUso?'lista atual do Júpiter':'lista atual do Júpiter';const note=document.getElementById('notice');if(meta.ultimoErro?.mensagem){note.textContent=meta.ultimoErro.mensagem;note.classList.add('show')}else note.classList.remove('show')}
-  async function load(){try{const r=await fetch(`/api/monitor${semestreSelecionado?`?semestre=${encodeURIComponent(semestreSelecionado)}`:''}`,{cache:'no-store'});if(!r.ok)throw new Error('Não foi possível ler os dados do monitor.');const data=await r.json();disciplinas=data.disciplinas||[];semestreAtual=data.semestre||null;semestrePadrao=data.semestrePadrao||null;semestres=data.semestres||[];arquivoSemestres=data.arquivo||[];renderSemestres();desativadas=data.desativadas||[];curriculo=data.curriculo||{versao:1,atualizadoEm:null,porCodigo:{},fontes:[]};meta=data.meta||{};refreshMeta();render();if(view==='grade')renderGrade();if(view==='desativadas')renderDesativadas();updateTimers()}catch(e){document.getElementById('dot').className='dot err';document.getElementById('serverStatus').textContent='Dados indisponíveis';document.getElementById('content').innerHTML=`<div class="empty">${escapeHtml(e.message)}</div>`}}
-  async function carregarCatalogoHistorico(){if(historyLoaded)return;const root=document.getElementById('historyBody');root.className='history-loading';root.textContent='Carregando histórico armazenado…';try{const r=await fetch('/api/historico',{cache:'no-store'});if(!r.ok)throw new Error('Não foi possível carregar o histórico.');const data=await r.json();historyCatalog=data.catalogo||[];historyLoaded=true;const select=document.getElementById('historyCourse');if(!historyCatalog.length){select.innerHTML='<option>Nenhum snapshot diário ainda</option>';select.disabled=true;root.className='history-loading';root.textContent='O histórico começará após a primeira consulta completa desta versão terminar.';return}select.disabled=false;select.innerHTML=historyCatalog.map(c=>`<option value="${escapeHtml(c.codigo)}">${escapeHtml(c.codigo)} — ${escapeHtml(c.nome)}</option>`).join('');const current=disciplinas[0]?.codigo;historyCode=historyCatalog.some(c=>c.codigo===current)?current:historyCatalog[0].codigo;select.value=historyCode;await carregarSerieHistorica()}catch(e){root.className='history-loading';root.textContent=e.message}}
+  async function load(){try{const r=await fetch(`/api/monitor${semestreSelecionado?`?semestre=${encodeURIComponent(semestreSelecionado)}`:''}`,{cache:'no-store'});if(!r.ok)throw new Error('Não foi possível ler os dados do monitor.');const data=await r.json();disciplinas=data.disciplinas||[];semestreAtual=data.semestre||null;semestrePadrao=data.semestrePadrao||null;semestres=data.semestres||[];arquivoSemestres=data.arquivo||[];renderSemestres();desativadas=data.desativadas||[];meta=data.meta||{};refreshMeta();render();if(view==='desativadas')renderDesativadas();updateTimers()}catch(e){document.getElementById('dot').className='dot err';document.getElementById('serverStatus').textContent='Dados indisponíveis';document.getElementById('content').innerHTML=`<div class="empty">${escapeHtml(e.message)}</div>`}}
+  async function carregarCatalogoHistorico(){if(historyLoaded)return;const root=document.getElementById('historyBody');root.className='history-loading';root.textContent='Carregando histórico armazenado…';try{const r=await fetch('/api/historico',{cache:'no-store'});if(!r.ok)throw new Error('Não foi possível carregar o histórico.');const data=await r.json();historyCatalog=data.catalogo||[];historyLoaded=true;const select=document.getElementById('historyCourse');if(!historyCatalog.length){select.innerHTML='<option>Nenhum snapshot diário ainda</option>';select.disabled=true;root.className='history-loading';root.textContent='O histórico começará após a primeira consulta completa desta versão terminar.';return}select.disabled=false;select.innerHTML=historyCatalog.map(c=>`<option value="${escapeHtml(c.codigo)}">${escapeHtml(rotuloDisciplina(c.codigo,c.nome))}</option>`).join('');const current=disciplinas[0]?.codigo;historyCode=historyCatalog.some(c=>c.codigo===current)?current:historyCatalog[0].codigo;select.value=historyCode;await carregarSerieHistorica()}catch(e){root.className='history-loading';root.textContent=e.message}}
   async function carregarSerieHistorica(){const root=document.getElementById('historyBody');if(!historyCode)return;root.className='history-loading';root.textContent='Desenhando evolução da disciplina…';try{const r=await fetch(`/api/historico?codigo=${encodeURIComponent(historyCode)}&dias=${historyDays}`,{cache:'no-store'});if(!r.ok)throw new Error('Não foi possível carregar a série histórica.');const data=await r.json();renderHistory(data)}catch(e){root.className='history-loading';root.textContent=e.message}}
   const HISTORY_METRICS={pessoas:{label:'Pessoas registradas',color:'#132c63'},inscritos:{label:'Inscritos',color:'#3d67d5'},pendentes:{label:'Pendentes',color:'#c57b13'},matriculados:{label:'Matriculados',color:'#157a4b'}};
   function ultimoRegistroOfertado(serie){return [...serie].reverse().find(p=>p?.ofertada===true&&Number.isFinite(p.pessoas))||null}
   function primeiroRegistroOfertado(serie){return serie.find(p=>p?.ofertada===true&&Number.isFinite(p.pessoas))||null}
   function deltaTexto(atual,inicial){if(!Number.isFinite(atual)||!Number.isFinite(inicial))return 'sem base anterior';const d=atual-inicial;return d===0?'sem mudança':`${d>0?'+':''}${number(d)} desde o início`}
-  function resumoMetricas(atual,inicial){return ['pessoas','inscritos','pendentes','matriculados'].map(chave=>{const item=HISTORY_METRICS[chave],valor=atual?atual[chave]:null;return `<div class="summary-item"><strong>${Number.isFinite(valor)?number(valor):'—'}</strong><span>${item.label}</span><small>${atual?deltaTexto(valor,inicial?.[chave]):'sem registro ofertado'}</small></div>`}).join('')}
+  function resumoMetricas(atual,inicial){return ['pessoas','inscritos','pendentes','matriculados'].map(chave=>{const item=HISTORY_METRICS[chave],valor=atual?atual[chave]:null;return `<div class="summary-item"><strong>${Number.isFinite(valor)?number(valor):'-'}</strong><span>${item.label}</span><small>${atual?deltaTexto(valor,inicial?.[chave]):'sem registro ofertado'}</small></div>`}).join('')}
   function renderHistory(data){
     const root=document.getElementById('historyBody'),serie=data.serie||[];
     if(!serie.length){root.className='history-loading';root.textContent='Ainda não há dias registrados para esta disciplina.';return}
@@ -498,19 +171,13 @@
   function caminhoSerie(serie,chave,x,y){let path='',ativo=false,ultimo=null;for(let i=0;i<serie.length;i++){const ponto=serie[i];if(ponto.ofertada===true&&Number.isFinite(ponto[chave])){path+=`${ativo?'L':'M'}${x(i).toFixed(2)},${y(ponto[chave]).toFixed(2)} `;ativo=true;ultimo={i,ponto}}else ativo=false}return {path:path.trim(),ultimo}}
   function drawChart(serie,modo){const svg=document.getElementById('historyChart');if(!svg)return;const W=960,H=350,L=58,R=24,T=20,B=72,pw=W-L-R,ph=H-T-B,chaves=modo==='detalhado'?['pessoas','inscritos','pendentes','matriculados']:[modo],valid=serie.flatMap(p=>p.ofertada===true?chaves.map(chave=>Number(p[chave])).filter(Number.isFinite):[]),max=Math.max(1,...valid),nice=Math.max(1,Math.ceil(max/5)*5),x=i=>L+(serie.length<=1?pw/2:(i/(serie.length-1))*pw),y=v=>T+ph-(v/nice)*ph;let out='';for(let n=0;n<=4;n++){const v=Math.round(nice*n/4),yy=y(v);out+=`<line class="chart-grid" x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}"/><text class="chart-axis" x="${L-9}" y="${yy+4}" text-anchor="end">${number(v)}</text>`}for(const chave of chaves){const {path,ultimo}=caminhoSerie(serie,chave,x,y),item=HISTORY_METRICS[chave];if(path)out+=`<path fill="none" stroke="${item.color}" stroke-width="${chave==='pessoas'?3.5:2.4}" stroke-linecap="round" stroke-linejoin="round" ${chave==='pessoas'&&modo==='detalhado'?'stroke-dasharray="7 4"':''} d="${path}"/>`;if(ultimo)out+=`<circle cx="${x(ultimo.i)}" cy="${y(ultimo.ponto[chave])}" r="${chave==='pessoas'?4.5:3.4}" fill="${item.color}" stroke="#fff" stroke-width="1.8"><title>${item.label}: ${number(ultimo.ponto[chave])}</title></circle>`}const stripY=H-42,stripH=7,barW=Math.max(1,pw/Math.max(serie.length,1));for(let i=0;i<serie.length;i++){const p=serie[i],fill=p.ofertada===true?'#3d67d5':p.ofertada===false?'#c7d0dd':'#ffffff',stroke=p.ofertada===null?'#c7d0dd':'none';out+=`<rect class="availability" x="${x(i)-barW/2}" y="${stripY}" width="${barW+0.4}" height="${stripH}" fill="${fill}" stroke="${stroke}" stroke-width="0.8"><title>${p.data}: ${p.ofertada===true?'oferta ativa':p.ofertada===false?'sem oferta':'sem leitura confirmada'}</title></rect>`}const labels=[];for(let i=0;i<serie.length;i++){const date=isoDate(serie[i].data),month=date.getUTCMonth(),day=date.getUTCDate();if(i===0||i===serie.length-1||(day===1&&!labels.some(l=>l.month===month&&l.year===date.getUTCFullYear())))labels.push({i,month,year:date.getUTCFullYear(),date})}const limited=labels.filter((l,i,a)=>a.length<=6||i===0||i===a.length-1||i%Math.ceil(a.length/6)===0);for(const l of limited)out+=`<text class="chart-axis" x="${x(l.i)}" y="${H-18}" text-anchor="middle">${fmtMonth.format(l.date)}</text>`;svg.innerHTML=out}
 
-  function setView(next){view=next;document.querySelectorAll('.view-tab').forEach(b=>b.classList.toggle('active',b.dataset.view===view));document.getElementById('monitorView').classList.toggle('hidden',view!=='monitor');document.getElementById('gradeView').classList.toggle('hidden',view!=='grade');document.getElementById('historyView').classList.toggle('hidden',view!=='historico');document.getElementById('deactivatedView').classList.toggle('hidden',view!=='desativadas');if(view==='grade')renderGrade();if(view==='historico')carregarCatalogoHistorico();if(view==='desativadas')renderDesativadas()}
+  function setView(next){view=next;document.querySelectorAll('.view-tab').forEach(b=>b.classList.toggle('active',b.dataset.view===view));document.getElementById('monitorView').classList.toggle('hidden',view!=='monitor');document.getElementById('historyView').classList.toggle('hidden',view!=='historico');document.getElementById('deactivatedView').classList.toggle('hidden',view!=='desativadas');if(view==='historico')carregarCatalogoHistorico();if(view==='desativadas')renderDesativadas()}
   document.querySelectorAll('.filter').forEach(b=>b.addEventListener('click',()=>{filtro=b.dataset.filter;document.querySelectorAll('.filter').forEach(x=>x.classList.toggle('active',x===b));render()}));
   document.querySelectorAll('.view-tab').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
   document.getElementById('historyCourse').addEventListener('change',e=>{historyCode=e.target.value;carregarSerieHistorica()});
   document.querySelectorAll('.period').forEach(b=>b.addEventListener('click',()=>{historyDays=b.dataset.days;document.querySelectorAll('.period').forEach(x=>x.classList.toggle('active',x===b));carregarSerieHistorica()}));
   document.querySelectorAll('.metric').forEach(b=>b.addEventListener('click',()=>{historyMetric=b.dataset.metric;document.querySelectorAll('.metric').forEach(x=>x.classList.toggle('active',x===b));carregarSerieHistorica()}));
-  document.getElementById('printSchedule').addEventListener('click',imprimirGrade);
-  document.getElementById('generateDocx').addEventListener('click',abrirDialogDocx);
-  document.getElementById('docxClose').addEventListener('click',fecharDialogDocx);
-  document.getElementById('docxCancel').addEventListener('click',fecharDialogDocx);
-  document.getElementById('docxForm').addEventListener('submit',event=>{event.preventDefault();const botao=document.getElementById('docxSubmit');botao.disabled=true;botao.textContent='Gerando…';try{baixarPlanilhaDocx(document.getElementById('docxTitle').value,document.getElementById('docxPeriod').value);fecharDialogDocx()}finally{setTimeout(()=>{botao.disabled=false;botao.textContent='Baixar DOCX'},250)}});
-  window.addEventListener('beforeprint',prepararDocumentoImpressao);
-  window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(view==='historico'&&historyLoaded&&historyCode)carregarSerieHistorica();if(view==='grade')renderGrade()},180)});
+  window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(view==='historico'&&historyLoaded&&historyCode)carregarSerieHistorica()},180)});
   load();setInterval(updateTimers,1000);setInterval(load,60*1000);
 </script>
 </body>
